@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Übersicht{% endblock %}
+
+{% block content %}
+<div class="grid">
+    {% if aktueller_user['ist_admin'] or aktueller_user['kann_anlegen'] %}
+    <section class="card">
+        <h2>Neue Platine anlegen</h2>
+        <form action="{{ url_for('platine_neu') }}" method="post" class="form" id="neue-platine-form">
+            <label>Seriennummer
+                <input type="text" name="seriennummer" placeholder="{{ vorschlag }} (leer lassen = automatisch)">
+            </label>
+
+            <label>Platinen-Typ
+                <select name="typ_id" id="typ_select">
+                    <option value="">– bitte wählen –</option>
+                    {% for t in typen %}
+                        <option value="{{ t['id'] }}">{{ t['name'] }}</option>
+                    {% endfor %}
+                    <option value="__neu__">+ Neuer Typ...</option>
+                </select>
+            </label>
+            <input type="text" name="neuer_typ" id="neuer_typ" placeholder="Name des neuen Typs" style="display:none;">
+
+            <label>Version
+                <select name="version_id" id="version_select">
+                    <option value="">– zuerst Typ wählen –</option>
+                    <option value="__neu__">+ Neue Version...</option>
+                </select>
+            </label>
+            <input type="text" name="neue_version" id="neue_version" placeholder="Name der neuen Version" style="display:none;">
+
+            <button type="submit" class="btn">Platine anlegen &amp; Reparatur erfassen</button>
+        </form>
+    </section>
+    {% endif %}
+
+    <section class="card">
+        <h2>Platine suchen</h2>
+        <form action="{{ url_for('index') }}" method="get" class="form">
+            <label>Seriennummer, Typ oder Version
+                <input type="text" name="q" value="{{ suche }}" placeholder="Suchbegriff...">
+            </label>
+            <button type="submit" class="btn btn-secondary">Suchen</button>
+            {% if suche %}
+                <a href="{{ url_for('index') }}" class="link-reset">Filter zurücksetzen</a>
+            {% endif %}
+        </form>
+    </section>
+</div>
+
+<section class="card">
+    <h2>Alle Platinen ({{ platinen|length }})</h2>
+    {% if platinen %}
+    {% macro sort_link(spalte, label) %}
+        {% set neue_richtung = 'asc' if (sort == spalte and richtung == 'desc') else 'desc' %}
+        <a href="{{ url_for('index', q=suche, sort=spalte, dir=neue_richtung) }}" class="sort-link">
+            {{ label }}
+            {% if sort == spalte %}{{ '↓' if richtung == 'desc' else '↑' }}{% endif %}
+        </a>
+    {% endmacro %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>{{ sort_link('seriennummer', 'Seriennummer') }}</th>
+                <th>{{ sort_link('typ', 'Typ') }}</th>
+                <th>{{ sort_link('version', 'Version') }}</th>
+                <th>{{ sort_link('anzahl', 'Anzahl Reparaturen') }}</th>
+                <th>{{ sort_link('letzte', 'Letzte Reparatur') }}</th>
+                <th>{{ sort_link('erstellt', 'Angelegt am') }}</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in platinen %}
+            <tr>
+                <td><a href="{{ url_for('platine_detail', platine_id=p['id']) }}" class="mono">{{ p['seriennummer'] }}</a></td>
+                <td>{{ p['typ_name'] or '–' }}</td>
+                <td>{{ p['version_name'] or '–' }}</td>
+                <td>
+                    {% if p['anzahl_reparaturen'] > 1 %}
+                        <span class="badge badge-warn">{{ p['anzahl_reparaturen'] }}× repariert</span>
+                    {% elif p['anzahl_reparaturen'] == 1 %}
+                        <span class="badge">1× repariert</span>
+                    {% else %}
+                        <span class="badge badge-ok">noch keine</span>
+                    {% endif %}
+                </td>
+                <td>{{ p['letzte_reparatur'] or '–' }}</td>
+                <td>{{ p['erstellt_am'][:10] }}</td>
+                <td>
+                    <a href="{{ url_for('platine_detail', platine_id=p['id']) }}" class="link">Details →</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p class="muted">Keine Platinen gefunden.</p>
+    {% endif %}
+</section>
+
+<script>
+    // Versionen pro Typ, serverseitig eingebettet
+    const versionenProTyp = {
+        {% for t in typen %}
+        "{{ t['id'] }}": [
+            {% for v in versionen if v['typ_id'] == t['id'] %}
+                {id: "{{ v['id'] }}", name: {{ v['name']|tojson }}},
+            {% endfor %}
+        ],
+        {% endfor %}
+    };
+
+    const typSelect = document.getElementById('typ_select');
+    const versionSelect = document.getElementById('version_select');
+    const neuerTypInput = document.getElementById('neuer_typ');
+    const neueVersionInput = document.getElementById('neue_version');
+
+    function versionenAktualisieren() {
+        const gewaehlterTyp = typSelect.value;
+        versionSelect.innerHTML = '';
+
+        if (gewaehlterTyp === '__neu__') {
+            versionSelect.innerHTML = '<option value="__neu__" selected>+ Neue Version...</option>';
+            neueVersionInput.style.display = 'block';
+            return;
+        }
+
+        const leer = document.createElement('option');
+        leer.value = '';
+        leer.textContent = gewaehlterTyp ? '– bitte wählen –' : '– zuerst Typ wählen –';
+        versionSelect.appendChild(leer);
+
+        (versionenProTyp[gewaehlterTyp] || []).forEach(function (v) {
+            const opt = document.createElement('option');
+            opt.value = v.id;
+            opt.textContent = v.name;
+            versionSelect.appendChild(opt);
+        });
+
+        const neu = document.createElement('option');
+        neu.value = '__neu__';
+        neu.textContent = '+ Neue Version...';
+        versionSelect.appendChild(neu);
+    }
+
+    if (typSelect) {
+        typSelect.addEventListener('change', function () {
+            neuerTypInput.style.display = (typSelect.value === '__neu__') ? 'block' : 'none';
+            versionenAktualisieren();
+        });
+        versionSelect.addEventListener('change', function () {
+            neueVersionInput.style.display = (versionSelect.value === '__neu__') ? 'block' : 'none';
+        });
+        versionenAktualisieren();
+    }
+</script>
+{% endblock %}

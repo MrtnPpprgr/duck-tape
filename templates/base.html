@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Duck-Tape{% endblock %} · Reparaturdatenbank</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="topbar">
+        <a href="{{ url_for('index') }}" class="logo">🦆 Duck-Tape <span>Reparaturdatenbank</span></a>
+        {% if aktueller_user %}
+        <nav class="nav">
+            {% if aktueller_user['ist_admin'] %}
+                <a href="{{ url_for('benutzer_liste') }}">Benutzerverwaltung</a>
+            {% endif %}
+            <a href="{{ url_for('konto') }}">Mein Konto</a>
+            <span class="nav-user">{{ aktueller_user['username'] }}
+                {% if aktueller_user['ist_admin'] %}<span class="rolle rolle-admin">Admin</span>
+                {% elif aktueller_user['kann_anlegen'] or aktueller_user['kann_loeschen'] or aktueller_user['kann_reparatur_bearbeiten'] %}<span class="rolle rolle-bearbeiter">Bearbeiter</span>
+                {% else %}<span class="rolle rolle-betrachter">Nur Ansicht</span>{% endif %}
+            </span>
+            <a href="{{ url_for('logout') }}">Abmelden</a>
+        </nav>
+        {% endif %}
+    </header>
+
+    <main class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">Duck-Tape · lokale Reparaturdatenbank</footer>
+</body>
+</html>

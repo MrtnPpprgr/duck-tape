@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Benutzerverwaltung{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('index') }}" class="link">← Zurück zur Übersicht</a>
+
+<section class="card">
+    <h2>Neues Konto anlegen</h2>
+    <form action="{{ url_for('benutzer_neu') }}" method="post" class="form">
+        <div class="form-row">
+            <label>Benutzername
+                <input type="text" name="username" required>
+            </label>
+            <label>Passwort
+                <input type="password" name="passwort" required minlength="4">
+            </label>
+        </div>
+        <div class="checkbox-row">
+            <label class="checkbox"><input type="checkbox" name="kann_anlegen"> Platinen anlegen</label>
+            <label class="checkbox"><input type="checkbox" name="kann_loeschen"> Platinen löschen</label>
+            <label class="checkbox"><input type="checkbox" name="kann_reparatur_bearbeiten"> Reparatur-Historie bearbeiten</label>
+            <label class="checkbox"><input type="checkbox" name="ist_admin"> Admin (Benutzerverwaltung + alle Rechte)</label>
+        </div>
+        <p class="muted">Ohne Häkchen kann das Konto alles nur ansehen, aber nichts ändern.</p>
+        <button type="submit" class="btn">Konto anlegen</button>
+    </form>
+</section>
+
+<section class="card">
+    <h2>Bestehende Konten ({{ users|length }})</h2>
+    <div class="user-list">
+    {% for u in users %}
+        <form action="{{ url_for('benutzer_aendern', user_id=u['id']) }}" method="post" class="user-row">
+            <div class="user-row-head">
+                <strong>{{ u['username'] }}</strong>
+                {% if u['id'] == aktueller_user['id'] %}<span class="muted">(du)</span>{% endif %}
+            </div>
+            <div class="checkbox-row">
+                <label class="checkbox"><input type="checkbox" name="kann_anlegen" {% if u['kann_anlegen'] %}checked{% endif %}> Anlegen</label>
+                <label class="checkbox"><input type="checkbox" name="kann_loeschen" {% if u['kann_loeschen'] %}checked{% endif %}> Löschen</label>
+                <label class="checkbox"><input type="checkbox" name="kann_reparatur_bearbeiten" {% if u['kann_reparatur_bearbeiten'] %}checked{% endif %}> Reparatur bearbeiten</label>
+                <label class="checkbox"><input type="checkbox" name="ist_admin" {% if u['ist_admin'] %}checked{% endif %}> Admin</label>
+            </div>
+            <div class="user-row-actions">
+                <input type="password" name="neues_passwort" placeholder="Neues Passwort (optional)" class="pw-input">
+                <button type="submit" class="btn btn-secondary">Speichern</button>
+                {% if u['id'] != aktueller_user['id'] %}
+                <button type="submit" formaction="{{ url_for('benutzer_loeschen', user_id=u['id']) }}"
+                        class="btn btn-danger" onclick="return confirm('Konto \'{{ u['username'] }}\' wirklich löschen?');">
+                    Löschen
+                </button>
+                {% endif %}
+            </div>
+        </form>
+    {% endfor %}
+    </div>
+</section>
+{% endblock %}

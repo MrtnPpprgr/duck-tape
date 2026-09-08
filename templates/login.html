@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Anmelden{% endblock %}
+
+{% block content %}
+<section class="card login-card">
+    <h2>Anmelden</h2>
+    <form method="post" class="form">
+        <label>Benutzername
+            <input type="text" name="username" required autofocus>
+        </label>
+        <label>Passwort
+            <input type="password" name="passwort" required>
+        </label>
+        <button type="submit" class="btn">Anmelden</button>
+    </form>
+</section>
+{% endblock %}

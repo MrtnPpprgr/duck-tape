@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}{{ platine['seriennummer'] }}{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('index') }}" class="link">← Zurück zur Übersicht</a>
+
+<section class="card platine-head">
+    <div>
+        <h2 class="mono">{{ platine['seriennummer'] }}</h2>
+        <p class="muted">
+            {{ platine['typ_name'] or 'Kein Typ' }}
+            {% if platine['version_name'] %} · Version {{ platine['version_name'] }}{% endif %}
+            · angelegt am {{ platine['erstellt_am'][:10] }}
+            {% if platine['erstellt_von'] %} von {{ platine['erstellt_von'] }}{% endif %}
+        </p>
+    </div>
+    {% if aktueller_user['ist_admin'] or aktueller_user['kann_loeschen'] %}
+    <form action="{{ url_for('platine_loeschen', platine_id=platine['id']) }}" method="post"
+          onsubmit="return confirm('Diese Platine inkl. gesamter Reparatur-Historie wirklich löschen?');">
+        <button type="submit" class="btn btn-danger">Platine löschen</button>
+    </form>
+    {% endif %}
+</section>
+
+{% if aktueller_user['ist_admin'] or aktueller_user['kann_reparatur_bearbeiten'] %}
+<section class="card">
+    <h2>Neue Reparatur eintragen</h2>
+    <form action="{{ url_for('reparatur_neu', platine_id=platine['id']) }}" method="post" enctype="multipart/form-data" class="form">
+        <div class="form-row">
+            <label>Datum
+                <input type="date" name="datum" value="{{ heute }}" required>
+            </label>
+            <label>Techniker / Bearbeiter
+                <input type="text" name="techniker" placeholder="Name">
+            </label>
+            <label>Kosten / Ersatzteile
+                <input type="text" name="kosten" placeholder="z.B. 15,90 € Sicherung + 0,5 h Arbeit">
+            </label>
+        </div>
+        <label>Fehlerbeschreibung
+            <textarea name="fehlerbeschreibung" rows="2" placeholder="Was war das Problem?"></textarea>
+        </label>
+        <label>Durchgeführte Reparatur / Maßnahme
+            <textarea name="massnahme" rows="2" placeholder="Was wurde gemacht?"></textarea>
+        </label>
+        <label>Fotos / Anhänge (mehrere möglich)
+            <input type="file" name="fotos" multiple accept="image/*,.pdf">
+        </label>
+        <button type="submit" class="btn">Reparatur speichern</button>
+    </form>
+</section>
+{% else %}
+<section class="card">
+    <p class="muted">Du hast nur Ansichtsrechte und kannst keine Reparaturen erfassen.</p>
+</section>
+{% endif %}
+
+<section class="card">
+    <h2>Reparatur-Historie ({{ reparaturen|length }})</h2>
+    {% if reparaturen %}
+        <div class="timeline">
+        {% for eintrag in reparaturen %}
+            {% set rep = eintrag.rep %}
+            <div class="timeline-item">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                    <div class="timeline-header">
+                        <strong>{{ rep['datum'] }}</strong>
+                        {% if rep['techniker'] %}<span class="muted"> · {{ rep['techniker'] }}</span>{% endif %}
+                        {% if aktueller_user['ist_admin'] or aktueller_user['kann_reparatur_bearbeiten'] %}
+                            <a href="{{ url_for('reparatur_bearbeiten', reparatur_id=rep['id']) }}" class="link edit-link">Bearbeiten</a>
+                        {% endif %}
+                    </div>
+                    {% if rep['fehlerbeschreibung'] %}
+                        <p><strong>Fehler:</strong> {{ rep['fehlerbeschreibung'] }}</p>
+                    {% endif %}
+                    {% if rep['massnahme'] %}
+                        <p><strong>Maßnahme:</strong> {{ rep['massnahme'] }}</p>
+                    {% endif %}
+                    {% if rep['kosten'] %}
+                        <p><strong>Kosten/Teile:</strong> {{ rep['kosten'] }}</p>
+                    {% endif %}
+                    {% if eintrag.fotos %}
+                        <div class="fotos">
+                            {% for foto in eintrag.fotos %}
+                                {% if foto['dateiname'].lower().endswith('.pdf') %}
+                                    <a href="{{ url_for('uploaded_file', dateiname=foto['dateiname']) }}" target="_blank" class="pdf-link">📄 PDF öffnen</a>
+                                {% else %}
+                                    <a href="{{ url_for('uploaded_file', dateiname=foto['dateiname']) }}" target="_blank">
+                                        <img src="{{ url_for('uploaded_file', dateiname=foto['dateiname']) }}" alt="Foto" class="thumb">
+                                    </a>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    {% if rep['geaendert_am'] %}
+                        <p class="muted small">zuletzt bearbeitet {{ rep['geaendert_am'][:16] }} von {{ rep['bearbeitet_von'] }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+        </div>
+    {% else %}
+        <p class="muted">Noch keine Reparaturen erfasst.</p>
+    {% endif %}
+</section>
+{% endblock %}

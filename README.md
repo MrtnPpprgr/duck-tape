@@ -5,6 +5,15 @@ kompletten Reparatur-Historie (Fehler, Maßnahme, Techniker, Kosten, Fotos).
 Läuft auf deinem PC und ist von anderen Geräten im selben Netzwerk aus über
 den Browser erreichbar – es muss nichts extra installiert werden außer Python.
 
+## ⚠️ Hinweis bei einem Update von einer älteren Version
+
+Diese Version hat eine neue Datenbankstruktur (Benutzerkonten, Typen/Versionen).
+Falls du schon eine `reparaturen.db` von einer älteren Version dieser App hast,
+lösche diese Datei einmalig, bevor du die neue Version startest, damit die
+neuen Tabellen sauber angelegt werden (bereits erfasste Fotos in
+`static/uploads/` bleiben unabhängig davon erhalten, sind dann aber keiner
+Platine mehr zugeordnet, falls die alte Datenbank gelöscht wird).
+
 ## 1. Voraussetzung: Python installieren
 
 Falls noch nicht vorhanden: Python 3.10 oder neuer von
@@ -81,26 +90,61 @@ http://192.168.1.42:5000
   `python app.py` offen bleiben (oder die App z. B. per Task-Planer/Autostart
   automatisch starten lassen – bei Bedarf kann ich das ergänzen).
 
-## 5. Funktionen
+## 5. Anmeldung & Benutzerkonten
+
+Die App ist jetzt durch einen Login geschützt. Beim allerersten Start wird
+automatisch ein Admin-Konto angelegt:
+
+```
+Benutzername: admin
+Passwort:     admin123
+```
+
+**Bitte direkt nach dem ersten Login unter "Mein Konto" das Passwort ändern!**
+
+Der Admin kann unter **"Benutzerverwaltung"** weitere Konten anlegen und pro
+Konto einzeln folgende Rechte vergeben:
+
+- **Platinen anlegen**
+- **Platinen löschen**
+- **Reparatur-Historie bearbeiten** (neue Einträge hinzufügen und bestehende ändern)
+- **Admin** (zusätzlich: Benutzerverwaltung, hat automatisch alle Rechte)
+
+Ein Konto **ohne** diese Häkchen kann sich zwar anmelden und alles ansehen,
+aber nichts anlegen, ändern oder löschen (reine Ansichtsrechte).
+
+## 6. Funktionen
 
 - **Neue Platine anlegen** – mit automatisch vergebener Seriennummer
   (Format `PL-JAHR-LAUFENDENUMMER`, z. B. `PL-2026-0007`) oder eigener
-  Seriennummer.
-- **Übersicht & Suche** – alle Platinen mit Anzahl bisheriger Reparaturen;
-  Suche nach Seriennummer oder Bezeichnung.
+  Seriennummer. Die Prüfung auf bereits vorhandene Seriennummern ignoriert
+  Groß-/Kleinschreibung (`abc-001` und `ABC-001` gelten als dieselbe Nummer).
+  **Nach dem Anlegen** öffnet sich sofort die Detail-/Reparaturseite der
+  neuen Platine.
+- **Typ & Version per Dropdown** – beim Anlegen einer Platine wählt man
+  zuerst den Platinen-Typ und danach die passende Version aus einer
+  Dropdown-Liste (die Versionsliste passt sich automatisch an den gewählten
+  Typ an). Über "+ Neuer Typ..." bzw. "+ Neue Version..." lassen sich neue
+  Einträge direkt beim Anlegen ergänzen.
+- **Übersicht, Suche & Sortierung** – alle Platinen mit Anzahl bisheriger
+  Reparaturen; Suche nach Seriennummer, Typ oder Version; jede Spaltenüber-
+  schrift ist klickbar und sortiert die Tabelle auf-/absteigend.
 - **Reparatur-Historie je Platine** – jede Reparatur wird als neuer
-  Historien-Eintrag gespeichert (nichts wird überschrieben), mit:
+  Historien-Eintrag gespeichert (nichts wird automatisch überschrieben), mit:
   - Datum
   - Fehlerbeschreibung
   - durchgeführte Reparatur/Maßnahme
   - Techniker/Bearbeiter
   - Kosten/Ersatzteile
   - Fotos/Anhänge (mehrere Bilder oder PDFs pro Eintrag)
+- **Reparatur-Einträge bearbeiten** – bestehende Historien-Einträge können
+  nachträglich korrigiert werden (inkl. Fotos hinzufügen/entfernen);
+  sichtbar ist dabei, wann und von wem zuletzt geändert wurde.
 - Wird eine Platine mehrfach repariert, siehst du auf der Übersichtsseite
   sofort "2× repariert", "3× repariert" usw., und auf der Detailseite die
   komplette Chronik.
 
-## 6. Daten & Backup
+## 7. Daten & Backup
 
 Alle Daten liegen in zwei Orten in diesem Ordner:
 - `reparaturen.db` – die eigentliche Datenbank (SQLite-Datei)
@@ -110,7 +154,7 @@ Für ein Backup reicht es, den gesamten `duck-tape`-Ordner (oder zumindest
 diese zwei Elemente) regelmäßig zu kopieren, z. B. auf ein Netzlaufwerk
 oder in die Cloud.
 
-## 7. App künftig wieder starten
+## 8. App künftig wieder starten
 
 Nach der Ersteinrichtung reicht künftig:
 
