@@ -56,7 +56,7 @@
             <textarea name="action_taken" rows="2" placeholder="Was wurde gemacht?"></textarea>
         </label>
         <label>Anhänge (mehrere möglich)
-            <input type="file" name="attachments" multiple accept="image/*,.pdf">
+            <input type="file" name="attachments" multiple>
         </label>
         <button type="submit" class="btn">Reparatur speichern</button>
     </form>
@@ -108,7 +108,7 @@
                                     <a href="{{ url_for('uploaded_file', filename=attachment['filename']) }}" target="_blank" class="pdf-link">📄 PDF öffnen</a>
                                 {% else %}
                                     <a href="{{ url_for('uploaded_file', filename=attachment['filename']) }}" target="_blank">
-                                        <img src="{{ url_for('uploaded_file', filename=attachment['filename']) }}" alt="Anhang" class="thumb">
+                                        <img src="{{ url_for('uploaded_file', filename=attachment['filename']) }}" alt="{{attachment['filename']}}" class="thumb">
                                     </a>
                                 {% endif %}
                             {% endfor %}
