@@ -31,7 +31,11 @@
                 <input type="date" name="date" value="{{ today }}" required>
             </label>
             <label>Techniker
-                <input type="text" name="technician" placeholder="Name">
+                {% if current_user['is_admin'] or current_user['can_edit_repairs']%}
+                    <input type="text" name="technician" value="{{ current_user['username'] }}">
+                {% else %}
+                    <input type="text" name="technician" value="{{ current_user['username'] }}" disabled>
+                {% endif %}
             </label>
             <label>Ersatzteile
                 <input type="text" name="parts" placeholder="z.B. Sicherung 2A, Kondensator 100uF">
