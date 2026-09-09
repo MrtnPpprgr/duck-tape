@@ -2,7 +2,7 @@
 {% block title %}{{ board['serial_number'] }}{% endblock %}
 
 {% block content %}
-<a href="{{ url_for('index') }}" class="link">← Zurück zur Übersicht</a>
+<a href="{{ url_for('index') }}" class="link">← Back to Dashboard</a>
 
 <section class="card board-head">
     <div>
@@ -10,13 +10,13 @@
         <p class="muted">
             {{ board['type_name'] or 'Kein Typ' }}
             {% if board['version_name'] %} · Version {{ board['version_name'] }}{% endif %}
-            · angelegt am {{ board['created_at'][:10] }}
-            {% if board['created_by'] %} von {{ board['created_by'] }}{% endif %}
+            · created on {{ board['created_at'][:10] }}
+            {% if board['created_by'] %} by {{ board['created_by'] }}{% endif %}
         </p>
     </div>
     {% if current_user['is_admin'] or current_user['can_delete'] %}
     <form action="{{ url_for('delete_board', board_id=board['id']) }}" method="post"
-          onsubmit="return confirm('Diese Platine inkl. gesamter Reparatur-Historie wirklich löschen?');">
+          onsubmit="return confirm('Do you really want to delete this repair, including its entire repair history?');">
         <button type="submit" class="btn btn-danger">Platine löschen</button>
     </form>
     {% endif %}
@@ -24,34 +24,34 @@
 
 {% if current_user['is_admin'] or current_user['can_edit_repairs'] %}
 <section class="card">
-    <h2>Neue Reparatur eintragen</h2>
+    <h2>New Repair</h2>
     <form action="{{ url_for('create_repair', board_id=board['id']) }}" method="post" enctype="multipart/form-data" class="form">
         <div class="form-row">
-            <label>Datum
+            <label>Date
                 <input type="date" name="date" value="{{ today }}" required>
             </label>
-            <label>Techniker
+            <label>Technician
                 <input type="text" name="technician" placeholder="Name">
             </label>
-            <label>Ersatzteile
-                <input type="text" name="parts" placeholder="z.B. Sicherung 2A, Kondensator 100uF">
+            <label>Parts
+                <input type="text" name="parts" placeholder="z.B. Fuse 2A, Capacitor 100uF">
             </label>
         </div>
-        <label>Fehlerbeschreibung
-            <textarea name="issue_description" rows="2" placeholder="Was war das Problem?"></textarea>
+        <label>Issue
+            <textarea name="issue_description" rows="2" placeholder="What was the Problem?"></textarea>
         </label>
-        <label>Durchgeführte Reparatur / Maßnahme
-            <textarea name="action_taken" rows="2" placeholder="Was wurde gemacht?"></textarea>
+        <label>Action
+            <textarea name="action_taken" rows="2" placeholder="What was done?"></textarea>
         </label>
-        <label>Anhänge (mehrere möglich)
+        <label>Attachments
             <input type="file" name="attachments" multiple accept="image/*,.pdf">
         </label>
-        <button type="submit" class="btn">Reparatur speichern</button>
+        <button type="submit" class="btn">save Repair</button>
     </form>
 </section>
 {% else %}
 <section class="card">
-    <p class="muted">Du hast nur Ansichtsrechte und kannst keine Reparaturen erfassen.</p>
+    <p class="muted">You only have view-permissions and can't create any Repairs.</p>
 </section>
 {% endif %}
 
@@ -72,13 +72,13 @@
                         {% endif %}
                     </div>
                     {% if repair['issue_description'] %}
-                        <p><strong>Fehler:</strong> {{ repair['issue_description'] }}</p>
+                        <p><strong>Error:</strong> {{ repair['issue_description'] }}</p>
                     {% endif %}
                     {% if repair['action_taken'] %}
-                        <p><strong>Maßnahme:</strong> {{ repair['action_taken'] }}</p>
+                        <p><strong>Action:</strong> {{ repair['action_taken'] }}</p>
                     {% endif %}
                     {% if repair['parts'] %}
-                        <p><strong>Ersatzteile:</strong> {{ repair['parts'] }}</p>
+                        <p><strong>Parts:</strong> {{ repair['parts'] }}</p>
                     {% endif %}
                     {% if entry.attachments %}
                         <div class="fotos">
@@ -94,14 +94,14 @@
                         </div>
                     {% endif %}
                     {% if repair['updated_at'] %}
-                        <p class="muted small">zuletzt bearbeitet {{ repair['updated_at'][:16] }} von {{ repair['updated_by'] }}</p>
+                        <p class="muted small">last Edit {{ repair['updated_at'][:16] }} by {{ repair['updated_by'] }}</p>
                     {% endif %}
                 </div>
             </div>
         {% endfor %}
         </div>
     {% else %}
-        <p class="muted">Noch keine Reparaturen erfasst.</p>
+        <p class="muted">No Repairs</p>
     {% endif %}
 </section>
 {% endblock %}

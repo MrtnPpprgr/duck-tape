@@ -2,32 +2,32 @@
 {% block title %}Benutzerverwaltung{% endblock %}
 
 {% block content %}
-<a href="{{ url_for('index') }}" class="link">← Zurück zur Übersicht</a>
+<a href="{{ url_for('index') }}" class="link">← Back to Dashboard</a>
 
 <section class="card">
-    <h2>Neues Konto anlegen</h2>
+    <h2>New User</h2>
     <form action="{{ url_for('create_user') }}" method="post" class="form">
         <div class="form-row">
-            <label>Benutzername
+            <label>Username
                 <input type="text" name="username" required>
             </label>
-            <label>Passwort
+            <label>Password
                 <input type="password" name="password" required minlength="4">
             </label>
         </div>
         <div class="checkbox-row">
-            <label class="checkbox"><input type="checkbox" name="can_create"> Platinen anlegen</label>
-            <label class="checkbox"><input type="checkbox" name="can_delete"> Platinen löschen</label>
-            <label class="checkbox"><input type="checkbox" name="can_edit_repairs"> Reparatur-Historie bearbeiten</label>
-            <label class="checkbox"><input type="checkbox" name="is_admin"> Admin (Benutzerverwaltung + alle Rechte)</label>
+            <label class="checkbox"><input type="checkbox" name="can_create"> create Entry</label>
+            <label class="checkbox"><input type="checkbox" name="can_delete"> Delete Entry</label>
+            <label class="checkbox"><input type="checkbox" name="can_edit_repairs"> Edit Repair History</label>
+            <label class="checkbox"><input type="checkbox" name="is_admin"> Admin (User Managment + all Rights)</label>
         </div>
-        <p class="muted">Ohne Häkchen kann das Konto alles nur ansehen, aber nichts ändern.</p>
-        <button type="submit" class="btn">Konto anlegen</button>
+        <p class="muted">No ticks => can only view</p>
+        <button type="submit" class="btn">create Account</button>
     </form>
 </section>
 
 <section class="card">
-    <h2>Bestehende Konten ({{ users|length }})</h2>
+    <h2>existing Accounts ({{ users|length }})</h2>
     <div class="user-list">
     {% for u in users %}
         <form action="{{ url_for('update_user', user_id=u['id']) }}" method="post" class="user-row">
@@ -36,9 +36,9 @@
                 {% if u['id'] == current_user['id'] %}<span class="muted">(du)</span>{% endif %}
             </div>
             <div class="checkbox-row">
-                <label class="checkbox"><input type="checkbox" name="can_create" {% if u['can_create'] %}checked{% endif %}> Anlegen</label>
-                <label class="checkbox"><input type="checkbox" name="can_delete" {% if u['can_delete'] %}checked{% endif %}> Löschen</label>
-                <label class="checkbox"><input type="checkbox" name="can_edit_repairs" {% if u['can_edit_repairs'] %}checked{% endif %}> Reparatur bearbeiten</label>
+                <label class="checkbox"><input type="checkbox" name="can_create" {% if u['can_create'] %}checked{% endif %}> create</label>
+                <label class="checkbox"><input type="checkbox" name="can_delete" {% if u['can_delete'] %}checked{% endif %}> delete</label>
+                <label class="checkbox"><input type="checkbox" name="can_edit_repairs" {% if u['can_edit_repairs'] %}checked{% endif %}> edit repairs</label>
                 <label class="checkbox"><input type="checkbox" name="is_admin" {% if u['is_admin'] %}checked{% endif %}> Admin</label>
             </div>
             <div class="user-row-actions">

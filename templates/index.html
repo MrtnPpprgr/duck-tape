@@ -5,52 +5,52 @@
 <div class="grid">
     {% if current_user['is_admin'] or current_user['can_create'] %}
     <section class="card">
-        <h2>Neue Platine anlegen</h2>
+        <h2>New Repair</h2>
         <form action="{{ url_for('create_board') }}" method="post" class="form" id="new-board-form">
-            <label>Seriennummer
+            <label>serialnumber
                 <input type="text" name="serial_number" placeholder="{{ suggested_serial }} (leer lassen = automatisch)">
             </label>
 
-            <label>Platinen-Typ
+            <label>Type
                 <select name="type_id" id="type_select">
-                    <option value="">– bitte wählen –</option>
+                    <option value="">– please choose –</option>
                     {% for t in types %}
                         <option value="{{ t['id'] }}">{{ t['name'] }}</option>
                     {% endfor %}
-                    <option value="__new__">+ Neuer Typ...</option>
+                    <option value="__new__">+ New Type...</option>
                 </select>
             </label>
             <input type="text" name="new_type" id="new_type" placeholder="Name des neuen Typs" style="display:none;">
 
             <label>Version
                 <select name="version_id" id="version_select">
-                    <option value="">– zuerst Typ wählen –</option>
-                    <option value="__new__">+ Neue Version...</option>
+                    <option value="">– first choose Type –</option>
+                    <option value="__new__">+ New Version...</option>
                 </select>
             </label>
             <input type="text" name="new_version" id="new_version" placeholder="Name der neuen Version" style="display:none;">
 
-            <button type="submit" class="btn">Platine anlegen &amp; Reparatur erfassen</button>
+            <button type="submit" class="btn">create Repair &amp; Log Repair </button>
         </form>
     </section>
     {% endif %}
 
     <section class="card">
-        <h2>Platine suchen</h2>
+        <h2>search Entry</h2>
         <form action="{{ url_for('index') }}" method="get" class="form">
-            <label>Seriennummer, Typ oder Version
+            <label>Serialnumber, Type or Version
                 <input type="text" name="q" value="{{ search }}" placeholder="Suchbegriff...">
             </label>
-            <button type="submit" class="btn btn-secondary">Suchen</button>
+            <button type="submit" class="btn btn-secondary">Search</button>
             {% if search %}
-                <a href="{{ url_for('index') }}" class="link-reset">Filter zurücksetzen</a>
+                <a href="{{ url_for('index') }}" class="link-reset">reset Filter</a>
             {% endif %}
         </form>
     </section>
 </div>
 
 <section class="card">
-    <h2>Alle Platinen ({{ boards|length }})</h2>
+    <h2>All Repairs ({{ boards|length }})</h2>
     {% if boards %}
     {% macro sort_link(column, label) %}
         {% set next_direction = 'asc' if (sort == column and direction == 'desc') else 'desc' %}
@@ -62,12 +62,12 @@
     <table class="table">
         <thead>
             <tr>
-                <th>{{ sort_link('serial_number', 'Seriennummer') }}</th>
-                <th>{{ sort_link('type', 'Typ') }}</th>
+                <th>{{ sort_link('serial_number', 'Serialnumber') }}</th>
+                <th>{{ sort_link('type', 'Type') }}</th>
                 <th>{{ sort_link('version', 'Version') }}</th>
-                <th>{{ sort_link('count', 'Anzahl Reparaturen') }}</th>
-                <th>{{ sort_link('last_repair', 'Letzte Reparatur') }}</th>
-                <th>{{ sort_link('created', 'Angelegt am') }}</th>
+                <th>{{ sort_link('count', 'Count of Repairs') }}</th>
+                <th>{{ sort_link('last_repair', 'last Repair') }}</th>
+                <th>{{ sort_link('created', 'Created on') }}</th>
                 <th></th>
             </tr>
         </thead>
@@ -79,11 +79,11 @@
                 <td>{{ b['version_name'] or '–' }}</td>
                 <td>
                     {% if b['repair_count'] > 1 %}
-                        <span class="badge badge-warn">{{ b['repair_count'] }}× repariert</span>
+                        <span class="badge badge-warn">{{ b['repair_count'] }}× repaired</span>
                     {% elif b['repair_count'] == 1 %}
-                        <span class="badge">1× repariert</span>
+                        <span class="badge">1× repaired</span>
                     {% else %}
-                        <span class="badge badge-ok">noch keine</span>
+                        <span class="badge badge-ok">none</span>
                     {% endif %}
                 </td>
                 <td>{{ b['last_repair_date'] or '–' }}</td>
@@ -96,7 +96,7 @@
         </tbody>
     </table>
     {% else %}
-        <p class="muted">Keine Platinen gefunden.</p>
+        <p class="muted">No Repair found.</p>
     {% endif %}
 </section>
 
@@ -122,14 +122,14 @@
         versionSelect.innerHTML = '';
 
         if (selectedType === '__new__') {
-            versionSelect.innerHTML = '<option value="__new__" selected>+ Neue Version...</option>';
+            versionSelect.innerHTML = '<option value="__new__" selected>+ New Version...</option>';
             newVersionInput.style.display = 'block';
             return;
         }
 
         const emptyOption = document.createElement('option');
         emptyOption.value = '';
-        emptyOption.textContent = selectedType ? '– bitte wählen –' : '– zuerst Typ wählen –';
+        emptyOption.textContent = selectedType ? '– please choose –' : '– first choose Type –';
         versionSelect.appendChild(emptyOption);
 
         (versionsByType[selectedType] || []).forEach(function (v) {
@@ -141,7 +141,7 @@
 
         const newOption = document.createElement('option');
         newOption.value = '__new__';
-        newOption.textContent = '+ Neue Version...';
+        newOption.textContent = '+ New Version...';
         versionSelect.appendChild(newOption);
     }
 

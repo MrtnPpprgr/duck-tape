@@ -8,19 +8,19 @@
 </head>
 <body>
     <header class="topbar">
-        <a href="{{ url_for('index') }}" class="logo">🦆 Duck-Tape <span>Reparaturdatenbank</span></a>
+        <a href="{{ url_for('index') }}" class="logo">🦆 Duck-Tape <span>Repair-Database</span></a>
         {% if current_user %}
         <nav class="nav">
             {% if current_user['is_admin'] %}
-                <a href="{{ url_for('users_list') }}">Benutzerverwaltung</a>
+                <a href="{{ url_for('users_list') }}">User Config</a>
             {% endif %}
-            <a href="{{ url_for('account') }}">Mein Konto</a>
+            <a href="{{ url_for('account') }}">My Account</a>
             <span class="nav-user">{{ current_user['username'] }}
-                {% if current_user['is_admin'] %}<span class="rolle rolle-admin">Admin</span>
+                {% if current_user['is_admin'] %}<span class="role role-admin">Admin</span>
                 {% elif current_user['can_create'] or current_user['can_delete'] or current_user['can_edit_repairs'] %}<span class="rolle rolle-bearbeiter">Bearbeiter</span>
                 {% else %}<span class="rolle rolle-betrachter">Nur Ansicht</span>{% endif %}
             </span>
-            <a href="{{ url_for('logout') }}">Abmelden</a>
+            <a href="{{ url_for('logout') }}">Log-Out</a>
         </nav>
         {% endif %}
     </header>
@@ -37,6 +37,6 @@
         {% block content %}{% endblock %}
     </main>
 
-    <footer class="footer">Duck-Tape · lokale Reparaturdatenbank</footer>
+    <footer class="footer">Duck-Tape · local Repair-Database</footer>
 </body>
 </html>
