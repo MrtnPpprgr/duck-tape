@@ -9,15 +9,15 @@
 <body>
     <header class="topbar">
         <a href="{{ url_for('index') }}" class="logo">🦆 Duck-Tape <span>Reparaturdatenbank</span></a>
-        {% if aktueller_user %}
+        {% if current_user %}
         <nav class="nav">
-            {% if aktueller_user['ist_admin'] %}
-                <a href="{{ url_for('benutzer_liste') }}">Benutzerverwaltung</a>
+            {% if current_user['is_admin'] %}
+                <a href="{{ url_for('users_list') }}">Benutzerverwaltung</a>
             {% endif %}
-            <a href="{{ url_for('konto') }}">Mein Konto</a>
-            <span class="nav-user">{{ aktueller_user['username'] }}
-                {% if aktueller_user['ist_admin'] %}<span class="rolle rolle-admin">Admin</span>
-                {% elif aktueller_user['kann_anlegen'] or aktueller_user['kann_loeschen'] or aktueller_user['kann_reparatur_bearbeiten'] %}<span class="rolle rolle-bearbeiter">Bearbeiter</span>
+            <a href="{{ url_for('account') }}">Mein Konto</a>
+            <span class="nav-user">{{ current_user['username'] }}
+                {% if current_user['is_admin'] %}<span class="rolle rolle-admin">Admin</span>
+                {% elif current_user['can_create'] or current_user['can_delete'] or current_user['can_edit_repairs'] %}<span class="rolle rolle-bearbeiter">Bearbeiter</span>
                 {% else %}<span class="rolle rolle-betrachter">Nur Ansicht</span>{% endif %}
             </span>
             <a href="{{ url_for('logout') }}">Abmelden</a>

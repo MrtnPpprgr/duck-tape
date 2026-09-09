@@ -1,17 +1,17 @@
 """
-Duck-Tape – Reparaturdatenbank für Platinen
-=============================================
-Lokal laufende Web-App (Flask + SQLite) mit Benutzerkonten/Berechtigungen,
-die im Heim-/Firmennetzwerk von mehreren Geräten aus aufgerufen werden kann.
+Duck-Tape - Repair database for PCBs (Platinen)
+=================================================
+A locally hosted web app (Flask + SQLite) with user accounts/permissions,
+reachable from other devices on the same home/office network.
 
 Start:  python app.py
-Danach im Browser:  http://localhost:5000
-Von anderen Geräten aus:  http://<IP-des-PCs>:5000
+Then open in a browser:  http://localhost:5000
+From other devices:      http://<PC-IP>:5000
 
-Beim allerersten Start wird automatisch ein Admin-Konto angelegt:
-    Benutzername: admin
-    Passwort:     admin123
-Bitte direkt nach dem ersten Login das Passwort ändern (siehe "Mein Konto")!
+On first run a default admin account is created automatically:
+    Username: admin
+    Password: admin123
+Please change the password right after the first login (see "Mein Konto")!
 """
 
 import os
@@ -25,20 +25,20 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATABASE = os.path.join(BASE_DIR, "reparaturen.db")
+DATABASE = os.path.join(BASE_DIR, "repairs.db")
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "uploads")
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "pdf"}
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = "duck-tape-secret-key-bitte-bei-bedarf-aendern"
+app.config["SECRET_KEY"] = "duck-tape-secret-key-please-change-if-needed"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024  # 32 MB pro Upload
+app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024  # 32 MB per upload
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 # ---------------------------------------------------------------------------
-# Datenbank-Hilfsfunktionen
+# Database helpers
 # ---------------------------------------------------------------------------
 
 def get_db():
@@ -63,123 +63,124 @@ def init_db():
     db.executescript(
         """
         CREATE TABLE IF NOT EXISTS users (
-            id                        INTEGER PRIMARY KEY AUTOINCREMENT,
-            username                  TEXT COLLATE NOCASE UNIQUE NOT NULL,
-            password_hash             TEXT NOT NULL,
-            kann_anlegen              INTEGER NOT NULL DEFAULT 0,
-            kann_loeschen             INTEGER NOT NULL DEFAULT 0,
-            kann_reparatur_bearbeiten INTEGER NOT NULL DEFAULT 0,
-            ist_admin                 INTEGER NOT NULL DEFAULT 0,
-            erstellt_am               TEXT NOT NULL
+            id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+            username           TEXT COLLATE NOCASE UNIQUE NOT NULL,
+            password_hash      TEXT NOT NULL,
+            can_create         INTEGER NOT NULL DEFAULT 0,
+            can_delete         INTEGER NOT NULL DEFAULT 0,
+            can_edit_repairs   INTEGER NOT NULL DEFAULT 0,
+            is_admin           INTEGER NOT NULL DEFAULT 0,
+            created_at         TEXT NOT NULL
         );
 
-        CREATE TABLE IF NOT EXISTS platinen_typen (
+        CREATE TABLE IF NOT EXISTS board_types (
             id    INTEGER PRIMARY KEY AUTOINCREMENT,
             name  TEXT COLLATE NOCASE UNIQUE NOT NULL
         );
 
-        CREATE TABLE IF NOT EXISTS platinen_versionen (
-            id      INTEGER PRIMARY KEY AUTOINCREMENT,
-            typ_id  INTEGER NOT NULL,
-            name    TEXT COLLATE NOCASE NOT NULL,
-            UNIQUE (typ_id, name),
-            FOREIGN KEY (typ_id) REFERENCES platinen_typen (id) ON DELETE CASCADE
+        CREATE TABLE IF NOT EXISTS board_versions (
+            id       INTEGER PRIMARY KEY AUTOINCREMENT,
+            type_id  INTEGER NOT NULL,
+            name     TEXT COLLATE NOCASE NOT NULL,
+            UNIQUE (type_id, name),
+            FOREIGN KEY (type_id) REFERENCES board_types (id) ON DELETE CASCADE
         );
 
-        CREATE TABLE IF NOT EXISTS platinen (
-            id            INTEGER PRIMARY KEY AUTOINCREMENT,
-            seriennummer  TEXT COLLATE NOCASE UNIQUE NOT NULL,
-            typ_id        INTEGER,
-            version_id    INTEGER,
-            erstellt_am   TEXT NOT NULL,
-            erstellt_von  TEXT,
-            FOREIGN KEY (typ_id) REFERENCES platinen_typen (id),
-            FOREIGN KEY (version_id) REFERENCES platinen_versionen (id)
+        CREATE TABLE IF NOT EXISTS boards (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            serial_number   TEXT COLLATE NOCASE UNIQUE NOT NULL,
+            type_id         INTEGER,
+            version_id      INTEGER,
+            created_at      TEXT NOT NULL,
+            created_by      TEXT,
+            FOREIGN KEY (type_id) REFERENCES board_types (id),
+            FOREIGN KEY (version_id) REFERENCES board_versions (id)
         );
 
-        CREATE TABLE IF NOT EXISTS reparaturen (
-            id                 INTEGER PRIMARY KEY AUTOINCREMENT,
-            platine_id         INTEGER NOT NULL,
-            datum              TEXT NOT NULL,
-            fehlerbeschreibung TEXT,
-            massnahme          TEXT,
-            techniker          TEXT,
-            kosten             TEXT,
-            erstellt_am        TEXT NOT NULL,
-            geaendert_am       TEXT,
-            bearbeitet_von     TEXT,
-            FOREIGN KEY (platine_id) REFERENCES platinen (id) ON DELETE CASCADE
+        CREATE TABLE IF NOT EXISTS repairs (
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+            board_id            INTEGER NOT NULL,
+            date                TEXT NOT NULL,
+            issue_description   TEXT,
+            action_taken        TEXT,
+            technician          TEXT,
+            parts               TEXT,
+            created_at          TEXT NOT NULL,
+            updated_at          TEXT,
+            updated_by          TEXT,
+            FOREIGN KEY (board_id) REFERENCES boards (id) ON DELETE CASCADE
         );
 
-        CREATE TABLE IF NOT EXISTS reparatur_fotos (
-            id             INTEGER PRIMARY KEY AUTOINCREMENT,
-            reparatur_id   INTEGER NOT NULL,
-            dateiname      TEXT NOT NULL,
-            FOREIGN KEY (reparatur_id) REFERENCES reparaturen (id) ON DELETE CASCADE
+        CREATE TABLE IF NOT EXISTS repair_attachments (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            repair_id   INTEGER NOT NULL,
+            filename    TEXT NOT NULL,
+            FOREIGN KEY (repair_id) REFERENCES repairs (id) ON DELETE CASCADE
         );
         """
     )
     db.commit()
 
-    # Beim allerersten Start ein Admin-Konto anlegen
-    anzahl_user = db.execute("SELECT COUNT(*) AS n FROM users").fetchone()["n"]
-    if anzahl_user == 0:
+    # Create a default admin account on the very first run
+    user_count = db.execute("SELECT COUNT(*) AS n FROM users").fetchone()["n"]
+    if user_count == 0:
         db.execute(
             """INSERT INTO users
-               (username, password_hash, kann_anlegen, kann_loeschen,
-                kann_reparatur_bearbeiten, ist_admin, erstellt_am)
+               (username, password_hash, can_create, can_delete,
+                can_edit_repairs, is_admin, created_at)
                VALUES (?, ?, 1, 1, 1, 1, ?)""",
             ("admin", generate_password_hash("admin123"),
              datetime.now().isoformat(timespec="seconds")),
         )
         db.commit()
-        print("\n*** Erstes Admin-Konto angelegt: Benutzername 'admin', Passwort 'admin123' ***")
-        print("*** Bitte nach dem ersten Login unter 'Mein Konto' das Passwort aendern! ***\n")
+        print("\n*** Default admin account created: username 'admin', password 'admin123' ***")
+        print("*** Please change the password after the first login (see 'Mein Konto')! ***\n")
 
     db.close()
 
 
-def naechste_seriennummer(db):
-    jahr = datetime.now().year
+def next_serial_number(db):
+    """Generate the next auto serial number, e.g. PL-2026-0007."""
+    year = datetime.now().year
     row = db.execute(
-        "SELECT COUNT(*) AS anzahl FROM platinen WHERE seriennummer LIKE ?",
-        (f"PL-{jahr}-%",),
+        "SELECT COUNT(*) AS count FROM boards WHERE serial_number LIKE ?",
+        (f"PL-{year}-%",),
     ).fetchone()
-    naechste_nr = row["anzahl"] + 1
-    return f"PL-{jahr}-{naechste_nr:04d}"
+    next_number = row["count"] + 1
+    return f"PL-{year}-{next_number:04d}"
 
 
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def get_or_create_typ(db, name):
+def get_or_create_type(db, name):
     name = name.strip()
-    row = db.execute("SELECT id FROM platinen_typen WHERE name = ? COLLATE NOCASE", (name,)).fetchone()
+    row = db.execute("SELECT id FROM board_types WHERE name = ? COLLATE NOCASE", (name,)).fetchone()
     if row:
         return row["id"]
-    cur = db.execute("INSERT INTO platinen_typen (name) VALUES (?)", (name,))
+    cur = db.execute("INSERT INTO board_types (name) VALUES (?)", (name,))
     return cur.lastrowid
 
 
-def get_or_create_version(db, typ_id, name):
+def get_or_create_version(db, type_id, name):
     name = name.strip()
     row = db.execute(
-        "SELECT id FROM platinen_versionen WHERE typ_id = ? AND name = ? COLLATE NOCASE",
-        (typ_id, name),
+        "SELECT id FROM board_versions WHERE type_id = ? AND name = ? COLLATE NOCASE",
+        (type_id, name),
     ).fetchone()
     if row:
         return row["id"]
-    cur = db.execute("INSERT INTO platinen_versionen (typ_id, name) VALUES (?, ?)", (typ_id, name))
+    cur = db.execute("INSERT INTO board_versions (type_id, name) VALUES (?, ?)", (type_id, name))
     return cur.lastrowid
 
 
 # ---------------------------------------------------------------------------
-# Login / Berechtigungen
+# Login / permissions
 # ---------------------------------------------------------------------------
 
 @app.before_request
-def lade_aktuellen_benutzer():
+def load_current_user():
     g.user = None
     user_id = session.get("user_id")
     if user_id:
@@ -197,13 +198,13 @@ def login_required(f):
 
 
 def permission_required(perm):
-    """perm: 'kann_anlegen' | 'kann_loeschen' | 'kann_reparatur_bearbeiten' | 'ist_admin'"""
+    """perm: 'can_create' | 'can_delete' | 'can_edit_repairs' | 'is_admin'"""
     def decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
             if g.user is None:
                 return redirect(url_for("login", next=request.path))
-            if not (g.user["ist_admin"] or g.user[perm]):
+            if not (g.user["is_admin"] or g.user[perm]):
                 flash("Du hast keine Berechtigung für diese Aktion – nur Ansicht möglich.", "fehler")
                 return redirect(request.referrer or url_for("index"))
             return f(*args, **kwargs)
@@ -213,11 +214,13 @@ def permission_required(perm):
 
 @app.context_processor
 def inject_user():
-    return {"aktueller_user": g.get("user")}
+    # Template variable name kept as 'aktueller_user' would also work, but we
+    # standardize on English here since templates are code, not user-facing.
+    return {"current_user": g.get("user")}
 
 
 # ---------------------------------------------------------------------------
-# Auth-Routen
+# Auth routes
 # ---------------------------------------------------------------------------
 
 @app.route("/login", methods=["GET", "POST"])
@@ -228,13 +231,13 @@ def login():
     if request.method == "POST":
         db = get_db()
         username = request.form.get("username", "").strip()
-        passwort = request.form.get("passwort", "")
+        password = request.form.get("password", "")
         user = db.execute("SELECT * FROM users WHERE username = ? COLLATE NOCASE", (username,)).fetchone()
-        if user and check_password_hash(user["password_hash"], passwort):
+        if user and check_password_hash(user["password_hash"], password):
             session.clear()
             session["user_id"] = user["id"]
-            ziel = request.args.get("next") or url_for("index")
-            return redirect(ziel)
+            target = request.args.get("next") or url_for("index")
+            return redirect(target)
         flash("Benutzername oder Passwort falsch.", "fehler")
 
     return render_template("login.html")
@@ -246,65 +249,65 @@ def logout():
     return redirect(url_for("login"))
 
 
-@app.route("/konto", methods=["GET", "POST"])
+@app.route("/account", methods=["GET", "POST"])
 @login_required
-def konto():
+def account():
     if request.method == "POST":
         db = get_db()
-        altes_pw = request.form.get("altes_passwort", "")
-        neues_pw = request.form.get("neues_passwort", "")
-        neues_pw2 = request.form.get("neues_passwort_wiederholen", "")
+        current_password = request.form.get("current_password", "")
+        new_password = request.form.get("new_password", "")
+        new_password_repeat = request.form.get("new_password_repeat", "")
 
-        if not check_password_hash(g.user["password_hash"], altes_pw):
+        if not check_password_hash(g.user["password_hash"], current_password):
             flash("Aktuelles Passwort ist falsch.", "fehler")
-        elif len(neues_pw) < 4:
+        elif len(new_password) < 4:
             flash("Neues Passwort muss mindestens 4 Zeichen haben.", "fehler")
-        elif neues_pw != neues_pw2:
+        elif new_password != new_password_repeat:
             flash("Die neuen Passwörter stimmen nicht überein.", "fehler")
         else:
             db.execute("UPDATE users SET password_hash = ? WHERE id = ?",
-                       (generate_password_hash(neues_pw), g.user["id"]))
+                       (generate_password_hash(new_password), g.user["id"]))
             db.commit()
             flash("Passwort wurde geändert.", "erfolg")
-            return redirect(url_for("konto"))
+            return redirect(url_for("account"))
 
-    return render_template("konto.html")
+    return render_template("account.html")
 
 
 # ---------------------------------------------------------------------------
-# Benutzerverwaltung (nur Admin)
+# User management (admin only)
 # ---------------------------------------------------------------------------
 
-@app.route("/benutzer")
-@permission_required("ist_admin")
-def benutzer_liste():
+@app.route("/users")
+@permission_required("is_admin")
+def users_list():
     db = get_db()
     users = db.execute("SELECT * FROM users ORDER BY username COLLATE NOCASE").fetchall()
-    return render_template("benutzer.html", users=users)
+    return render_template("users.html", users=users)
 
 
-@app.route("/benutzer/neu", methods=["POST"])
-@permission_required("ist_admin")
-def benutzer_neu():
+@app.route("/users/new", methods=["POST"])
+@permission_required("is_admin")
+def create_user():
     db = get_db()
     username = request.form.get("username", "").strip()
-    passwort = request.form.get("passwort", "").strip()
+    password = request.form.get("password", "").strip()
 
-    if not username or not passwort:
+    if not username or not password:
         flash("Benutzername und Passwort werden benötigt.", "fehler")
-        return redirect(url_for("benutzer_liste"))
+        return redirect(url_for("users_list"))
 
     try:
         db.execute(
             """INSERT INTO users
-               (username, password_hash, kann_anlegen, kann_loeschen,
-                kann_reparatur_bearbeiten, ist_admin, erstellt_am)
+               (username, password_hash, can_create, can_delete,
+                can_edit_repairs, is_admin, created_at)
                VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (username, generate_password_hash(passwort),
-             1 if request.form.get("kann_anlegen") else 0,
-             1 if request.form.get("kann_loeschen") else 0,
-             1 if request.form.get("kann_reparatur_bearbeiten") else 0,
-             1 if request.form.get("ist_admin") else 0,
+            (username, generate_password_hash(password),
+             1 if request.form.get("can_create") else 0,
+             1 if request.form.get("can_delete") else 0,
+             1 if request.form.get("can_edit_repairs") else 0,
+             1 if request.form.get("is_admin") else 0,
              datetime.now().isoformat(timespec="seconds")),
         )
         db.commit()
@@ -312,65 +315,65 @@ def benutzer_neu():
     except sqlite3.IntegrityError:
         flash(f"Benutzername '{username}' existiert bereits.", "fehler")
 
-    return redirect(url_for("benutzer_liste"))
+    return redirect(url_for("users_list"))
 
 
-@app.route("/benutzer/<int:user_id>/aendern", methods=["POST"])
-@permission_required("ist_admin")
-def benutzer_aendern(user_id):
+@app.route("/users/<int:user_id>/update", methods=["POST"])
+@permission_required("is_admin")
+def update_user(user_id):
     db = get_db()
     user = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     if user is None:
         abort(404)
 
-    if user_id == g.user["id"] and not request.form.get("ist_admin"):
+    if user_id == g.user["id"] and not request.form.get("is_admin"):
         flash("Du kannst dir nicht selbst die Admin-Rechte entziehen.", "fehler")
-        return redirect(url_for("benutzer_liste"))
+        return redirect(url_for("users_list"))
 
     db.execute(
-        """UPDATE users SET kann_anlegen = ?, kann_loeschen = ?,
-           kann_reparatur_bearbeiten = ?, ist_admin = ? WHERE id = ?""",
-        (1 if request.form.get("kann_anlegen") else 0,
-         1 if request.form.get("kann_loeschen") else 0,
-         1 if request.form.get("kann_reparatur_bearbeiten") else 0,
-         1 if request.form.get("ist_admin") else 0,
+        """UPDATE users SET can_create = ?, can_delete = ?,
+           can_edit_repairs = ?, is_admin = ? WHERE id = ?""",
+        (1 if request.form.get("can_create") else 0,
+         1 if request.form.get("can_delete") else 0,
+         1 if request.form.get("can_edit_repairs") else 0,
+         1 if request.form.get("is_admin") else 0,
          user_id),
     )
 
-    neues_pw = request.form.get("neues_passwort", "").strip()
-    if neues_pw:
+    new_password = request.form.get("new_password", "").strip()
+    if new_password:
         db.execute("UPDATE users SET password_hash = ? WHERE id = ?",
-                   (generate_password_hash(neues_pw), user_id))
+                   (generate_password_hash(new_password), user_id))
 
     db.commit()
     flash(f"Konto '{user['username']}' wurde aktualisiert.", "erfolg")
-    return redirect(url_for("benutzer_liste"))
+    return redirect(url_for("users_list"))
 
 
-@app.route("/benutzer/<int:user_id>/loeschen", methods=["POST"])
-@permission_required("ist_admin")
-def benutzer_loeschen(user_id):
+@app.route("/users/<int:user_id>/delete", methods=["POST"])
+@permission_required("is_admin")
+def delete_user(user_id):
     if user_id == g.user["id"]:
         flash("Du kannst dein eigenes Konto nicht löschen.", "fehler")
-        return redirect(url_for("benutzer_liste"))
+        return redirect(url_for("users_list"))
     db = get_db()
     db.execute("DELETE FROM users WHERE id = ?", (user_id,))
     db.commit()
     flash("Konto wurde gelöscht.", "erfolg")
-    return redirect(url_for("benutzer_liste"))
+    return redirect(url_for("users_list"))
 
 
 # ---------------------------------------------------------------------------
-# Platinen-Übersicht mit Suche & Sortierung
+# Board overview with search & sorting
 # ---------------------------------------------------------------------------
 
-SORTIERBARE_SPALTEN = {
-    "seriennummer": "p.seriennummer COLLATE NOCASE",
-    "typ": "typ_name COLLATE NOCASE",
+SORTABLE_COLUMNS = {
+    "serial_number": "b.serial_number COLLATE NOCASE",
+    "type": "type_name COLLATE NOCASE",
     "version": "version_name COLLATE NOCASE",
-    "anzahl": "anzahl_reparaturen",
-    "letzte": "letzte_reparatur",
-    "erstellt": "p.erstellt_am",
+    "count": "repair_count",
+    "last_repair": "last_repair_date",
+    "created": "b.created_at",
 }
 
 
@@ -378,252 +381,254 @@ SORTIERBARE_SPALTEN = {
 @login_required
 def index():
     db = get_db()
-    suche = request.args.get("q", "").strip()
-    sort = request.args.get("sort", "erstellt")
-    richtung = request.args.get("dir", "desc")
-    if sort not in SORTIERBARE_SPALTEN:
-        sort = "erstellt"
-    if richtung not in ("asc", "desc"):
-        richtung = "desc"
+    search = request.args.get("q", "").strip()
+    sort = request.args.get("sort", "created")
+    direction = request.args.get("dir", "desc")
+    if sort not in SORTABLE_COLUMNS:
+        sort = "created"
+    if direction not in ("asc", "desc"):
+        direction = "desc"
 
-    basis_query = """
-        SELECT p.*,
-               t.name AS typ_name,
+    base_query = """
+        SELECT b.*,
+               t.name AS type_name,
                v.name AS version_name,
-               COUNT(r.id) AS anzahl_reparaturen,
-               MAX(r.datum) AS letzte_reparatur
-        FROM platinen p
-        LEFT JOIN platinen_typen t ON t.id = p.typ_id
-        LEFT JOIN platinen_versionen v ON v.id = p.version_id
-        LEFT JOIN reparaturen r ON r.platine_id = p.id
+               COUNT(r.id) AS repair_count,
+               MAX(r.date) AS last_repair_date
+        FROM boards b
+        LEFT JOIN board_types t ON t.id = b.type_id
+        LEFT JOIN board_versions v ON v.id = b.version_id
+        LEFT JOIN repairs r ON r.board_id = b.id
     """
     params = []
-    if suche:
-        basis_query += """
-            WHERE p.seriennummer LIKE ? OR t.name LIKE ? OR v.name LIKE ?
-        """
-        params += [f"%{suche}%", f"%{suche}%", f"%{suche}%"]
+    if search:
+        base_query += " WHERE b.serial_number LIKE ? OR t.name LIKE ? OR v.name LIKE ? "
+        params += [f"%{search}%", f"%{search}%", f"%{search}%"]
 
-    basis_query += f" GROUP BY p.id ORDER BY {SORTIERBARE_SPALTEN[sort]} {richtung.upper()}"
+    base_query += f" GROUP BY b.id ORDER BY {SORTABLE_COLUMNS[sort]} {direction.upper()}"
 
-    platinen = db.execute(basis_query, params).fetchall()
-    vorschlag = naechste_seriennummer(db)
+    boards = db.execute(base_query, params).fetchall()
+    suggested_serial = next_serial_number(db)
 
-    typen = db.execute("SELECT * FROM platinen_typen ORDER BY name COLLATE NOCASE").fetchall()
-    versionen = db.execute("SELECT * FROM platinen_versionen ORDER BY name COLLATE NOCASE").fetchall()
+    types = db.execute("SELECT * FROM board_types ORDER BY name COLLATE NOCASE").fetchall()
+    versions = db.execute("SELECT * FROM board_versions ORDER BY name COLLATE NOCASE").fetchall()
 
     return render_template(
-        "index.html", platinen=platinen, suche=suche, vorschlag=vorschlag,
-        typen=typen, versionen=versionen, sort=sort, richtung=richtung,
+        "index.html", boards=boards, search=search, suggested_serial=suggested_serial,
+        types=types, versions=versions, sort=sort, direction=direction,
     )
 
 
-@app.route("/platine/neu", methods=["POST"])
-@permission_required("kann_anlegen")
-def platine_neu():
+@app.route("/boards/new", methods=["POST"])
+@permission_required("can_create")
+def create_board():
     db = get_db()
-    seriennummer = request.form.get("seriennummer", "").strip()
-    if not seriennummer:
-        seriennummer = naechste_seriennummer(db)
+    serial_number = request.form.get("serial_number", "").strip()
+    if not serial_number:
+        serial_number = next_serial_number(db)
 
-    typ_auswahl = request.form.get("typ_id", "")
-    neuer_typ = request.form.get("neuer_typ", "").strip()
-    version_auswahl = request.form.get("version_id", "")
-    neue_version = request.form.get("neue_version", "").strip()
+    type_choice = request.form.get("type_id", "")
+    new_type_name = request.form.get("new_type", "").strip()
+    version_choice = request.form.get("version_id", "")
+    new_version_name = request.form.get("new_version", "").strip()
 
-    typ_id = None
+    type_id = None
     version_id = None
 
-    if typ_auswahl == "__neu__" and neuer_typ:
-        typ_id = get_or_create_typ(db, neuer_typ)
-    elif typ_auswahl.isdigit():
-        typ_id = int(typ_auswahl)
+    if type_choice == "__new__" and new_type_name:
+        type_id = get_or_create_type(db, new_type_name)
+    elif type_choice.isdigit():
+        type_id = int(type_choice)
 
-    if typ_id is not None:
-        if version_auswahl == "__neu__" and neue_version:
-            version_id = get_or_create_version(db, typ_id, neue_version)
-        elif version_auswahl.isdigit():
-            version_id = int(version_auswahl)
+    if type_id is not None:
+        if version_choice == "__new__" and new_version_name:
+            version_id = get_or_create_version(db, type_id, new_version_name)
+        elif version_choice.isdigit():
+            version_id = int(version_choice)
 
-    # Case-insensitive Duplikatsprüfung (zusätzlich zur DB-Constraint, für klare Fehlermeldung)
-    vorhanden = db.execute(
-        "SELECT id FROM platinen WHERE seriennummer = ? COLLATE NOCASE", (seriennummer,)
+    # Case-insensitive duplicate check (in addition to the DB constraint, for a clear message)
+    existing = db.execute(
+        "SELECT id FROM boards WHERE serial_number = ? COLLATE NOCASE", (serial_number,)
     ).fetchone()
-    if vorhanden:
-        flash(f"Eine Platine mit der Seriennummer '{seriennummer}' existiert bereits "
+    if existing:
+        flash(f"Eine Platine mit der Seriennummer '{serial_number}' existiert bereits "
               f"(Groß-/Kleinschreibung wird ignoriert).", "fehler")
         return redirect(url_for("index"))
 
     cur = db.execute(
-        "INSERT INTO platinen (seriennummer, typ_id, version_id, erstellt_am, erstellt_von) "
+        "INSERT INTO boards (serial_number, type_id, version_id, created_at, created_by) "
         "VALUES (?, ?, ?, ?, ?)",
-        (seriennummer, typ_id, version_id, datetime.now().isoformat(timespec="seconds"),
+        (serial_number, type_id, version_id, datetime.now().isoformat(timespec="seconds"),
          g.user["username"]),
     )
     db.commit()
-    flash(f"Platine '{seriennummer}' wurde angelegt.", "erfolg")
-    # Sofort zur Reparatur-Seite dieser neuen Platine weiterleiten
-    return redirect(url_for("platine_detail", platine_id=cur.lastrowid))
+    flash(f"Platine '{serial_number}' wurde angelegt.", "erfolg")
+    # Jump straight to the repair page of the newly created board
+    return redirect(url_for("board_detail", board_id=cur.lastrowid))
 
 
-@app.route("/typen/<int:typ_id>/versionen")
+@app.route("/types/<int:type_id>/versions")
 @login_required
-def versionen_fuer_typ(typ_id):
-    """Kleine JSON-Hilfsroute fürs kaskadierende Dropdown (Fallback, falls JS es braucht)."""
+def versions_for_type(type_id):
+    """Small JSON helper for the cascading dropdown (fallback in case JS needs it)."""
     db = get_db()
-    versionen = db.execute(
-        "SELECT id, name FROM platinen_versionen WHERE typ_id = ? ORDER BY name COLLATE NOCASE",
-        (typ_id,),
+    versions = db.execute(
+        "SELECT id, name FROM board_versions WHERE type_id = ? ORDER BY name COLLATE NOCASE",
+        (type_id,),
     ).fetchall()
-    return {"versionen": [{"id": v["id"], "name": v["name"]} for v in versionen]}
+    return {"versions": [{"id": v["id"], "name": v["name"]} for v in versions]}
 
 
-@app.route("/platine/<int:platine_id>")
+@app.route("/boards/<int:board_id>")
 @login_required
-def platine_detail(platine_id):
+def board_detail(board_id):
     db = get_db()
-    platine = db.execute(
-        """SELECT p.*, t.name AS typ_name, v.name AS version_name
-           FROM platinen p
-           LEFT JOIN platinen_typen t ON t.id = p.typ_id
-           LEFT JOIN platinen_versionen v ON v.id = p.version_id
-           WHERE p.id = ?""",
-        (platine_id,),
+    board = db.execute(
+        """SELECT b.*, t.name AS type_name, v.name AS version_name
+           FROM boards b
+           LEFT JOIN board_types t ON t.id = b.type_id
+           LEFT JOIN board_versions v ON v.id = b.version_id
+           WHERE b.id = ?""",
+        (board_id,),
     ).fetchone()
-    if platine is None:
+    if board is None:
         abort(404)
 
-    reparaturen = db.execute(
-        "SELECT * FROM reparaturen WHERE platine_id = ? ORDER BY datum DESC, id DESC",
-        (platine_id,),
+    repairs = db.execute(
+        "SELECT * FROM repairs WHERE board_id = ? ORDER BY date DESC, id DESC",
+        (board_id,),
     ).fetchall()
 
-    reparaturen_mit_fotos = []
-    for rep in reparaturen:
-        fotos = db.execute(
-            "SELECT * FROM reparatur_fotos WHERE reparatur_id = ?", (rep["id"],)
+    repairs_with_attachments = []
+    for repair in repairs:
+        attachments = db.execute(
+            "SELECT * FROM repair_attachments WHERE repair_id = ?", (repair["id"],)
         ).fetchall()
-        reparaturen_mit_fotos.append({"rep": rep, "fotos": fotos})
+        repairs_with_attachments.append({"repair": repair, "attachments": attachments})
 
     return render_template(
-        "platine.html",
-        platine=platine,
-        reparaturen=reparaturen_mit_fotos,
-        heute=datetime.now().strftime("%Y-%m-%d"),
+        "board.html",
+        board=board,
+        repairs=repairs_with_attachments,
+        today=datetime.now().strftime("%Y-%m-%d"),
     )
 
 
-@app.route("/platine/<int:platine_id>/reparatur", methods=["POST"])
-@permission_required("kann_reparatur_bearbeiten")
-def reparatur_neu(platine_id):
+@app.route("/boards/<int:board_id>/repairs", methods=["POST"])
+@permission_required("can_edit_repairs")
+def create_repair(board_id):
     db = get_db()
-    platine = db.execute("SELECT * FROM platinen WHERE id = ?", (platine_id,)).fetchone()
-    if platine is None:
+    board = db.execute("SELECT * FROM boards WHERE id = ?", (board_id,)).fetchone()
+    if board is None:
         abort(404)
 
-    datum = request.form.get("datum") or datetime.now().strftime("%Y-%m-%d")
-    fehlerbeschreibung = request.form.get("fehlerbeschreibung", "").strip()
-    massnahme = request.form.get("massnahme", "").strip()
-    techniker = request.form.get("techniker", "").strip()
-    kosten = request.form.get("kosten", "").strip()
+    date = request.form.get("date") or datetime.now().strftime("%Y-%m-%d")
+    issue_description = request.form.get("issue_description", "").strip()
+    action_taken = request.form.get("action_taken", "").strip()
+    technician = request.form.get("technician", "").strip()
+    parts = request.form.get("parts", "").strip()
 
     cur = db.execute(
-        """INSERT INTO reparaturen
-           (platine_id, datum, fehlerbeschreibung, massnahme, techniker, kosten, erstellt_am)
+        """INSERT INTO repairs
+           (board_id, date, issue_description, action_taken, technician, parts, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)""",
-        (platine_id, datum, fehlerbeschreibung, massnahme, techniker, kosten,
+        (board_id, date, issue_description, action_taken, technician, parts,
          datetime.now().isoformat(timespec="seconds")),
     )
-    reparatur_id = cur.lastrowid
+    repair_id = cur.lastrowid
 
-    dateien = request.files.getlist("fotos")
-    for datei in dateien:
-        if datei and datei.filename and allowed_file(datei.filename):
-            sicherer_name = secure_filename(datei.filename)
-            eindeutiger_name = f"{platine_id}_{reparatur_id}_{int(datetime.now().timestamp())}_{sicherer_name}"
-            datei.save(os.path.join(app.config["UPLOAD_FOLDER"], eindeutiger_name))
+    files = request.files.getlist("attachments")
+    for file in files:
+        if file and file.filename and allowed_file(file.filename):
+            safe_name = secure_filename(file.filename)
+            unique_name = f"{board_id}_{repair_id}_{int(datetime.now().timestamp())}_{safe_name}"
+            file.save(os.path.join(app.config["UPLOAD_FOLDER"], unique_name))
             db.execute(
-                "INSERT INTO reparatur_fotos (reparatur_id, dateiname) VALUES (?, ?)",
-                (reparatur_id, eindeutiger_name),
+                "INSERT INTO repair_attachments (repair_id, filename) VALUES (?, ?)",
+                (repair_id, unique_name),
             )
 
     db.commit()
     flash("Reparatur-Eintrag wurde hinzugefügt.", "erfolg")
-    return redirect(url_for("platine_detail", platine_id=platine_id))
+    return redirect(url_for("board_detail", board_id=board_id))
 
 
-@app.route("/reparatur/<int:reparatur_id>/bearbeiten", methods=["GET", "POST"])
-@permission_required("kann_reparatur_bearbeiten")
-def reparatur_bearbeiten(reparatur_id):
+@app.route("/repairs/<int:repair_id>/edit", methods=["GET", "POST"])
+@permission_required("can_edit_repairs")
+def edit_repair(repair_id):
     db = get_db()
-    rep = db.execute("SELECT * FROM reparaturen WHERE id = ?", (reparatur_id,)).fetchone()
-    if rep is None:
+    repair = db.execute("SELECT * FROM repairs WHERE id = ?", (repair_id,)).fetchone()
+    if repair is None:
         abort(404)
 
     if request.method == "POST":
-        datum = request.form.get("datum") or rep["datum"]
-        fehlerbeschreibung = request.form.get("fehlerbeschreibung", "").strip()
-        massnahme = request.form.get("massnahme", "").strip()
-        techniker = request.form.get("techniker", "").strip()
-        kosten = request.form.get("kosten", "").strip()
+        date = request.form.get("date") or repair["date"]
+        issue_description = request.form.get("issue_description", "").strip()
+        action_taken = request.form.get("action_taken", "").strip()
+        technician = request.form.get("technician", "").strip()
+        parts = request.form.get("parts", "").strip()
 
         db.execute(
-            """UPDATE reparaturen SET datum = ?, fehlerbeschreibung = ?, massnahme = ?,
-               techniker = ?, kosten = ?, geaendert_am = ?, bearbeitet_von = ?
+            """UPDATE repairs SET date = ?, issue_description = ?, action_taken = ?,
+               technician = ?, parts = ?, updated_at = ?, updated_by = ?
                WHERE id = ?""",
-            (datum, fehlerbeschreibung, massnahme, techniker, kosten,
-             datetime.now().isoformat(timespec="seconds"), g.user["username"], reparatur_id),
+            (date, issue_description, action_taken, technician, parts,
+             datetime.now().isoformat(timespec="seconds"), g.user["username"], repair_id),
         )
 
-        dateien = request.files.getlist("fotos")
-        for datei in dateien:
-            if datei and datei.filename and allowed_file(datei.filename):
-                sicherer_name = secure_filename(datei.filename)
-                eindeutiger_name = f"{rep['platine_id']}_{reparatur_id}_{int(datetime.now().timestamp())}_{sicherer_name}"
-                datei.save(os.path.join(app.config["UPLOAD_FOLDER"], eindeutiger_name))
+        files = request.files.getlist("attachments")
+        for file in files:
+            if file and file.filename and allowed_file(file.filename):
+                safe_name = secure_filename(file.filename)
+                unique_name = f"{repair['board_id']}_{repair_id}_{int(datetime.now().timestamp())}_{safe_name}"
+                file.save(os.path.join(app.config["UPLOAD_FOLDER"], unique_name))
                 db.execute(
-                    "INSERT INTO reparatur_fotos (reparatur_id, dateiname) VALUES (?, ?)",
-                    (reparatur_id, eindeutiger_name),
+                    "INSERT INTO repair_attachments (repair_id, filename) VALUES (?, ?)",
+                    (repair_id, unique_name),
                 )
 
-        loeschen_ids = request.form.getlist("foto_loeschen")
-        for foto_id in loeschen_ids:
-            foto = db.execute("SELECT * FROM reparatur_fotos WHERE id = ?", (foto_id,)).fetchone()
-            if foto:
-                pfad = os.path.join(app.config["UPLOAD_FOLDER"], foto["dateiname"])
-                if os.path.exists(pfad):
-                    os.remove(pfad)
-                db.execute("DELETE FROM reparatur_fotos WHERE id = ?", (foto_id,))
+        attachment_ids_to_delete = request.form.getlist("delete_attachment")
+        for attachment_id in attachment_ids_to_delete:
+            attachment = db.execute(
+                "SELECT * FROM repair_attachments WHERE id = ?", (attachment_id,)
+            ).fetchone()
+            if attachment:
+                path = os.path.join(app.config["UPLOAD_FOLDER"], attachment["filename"])
+                if os.path.exists(path):
+                    os.remove(path)
+                db.execute("DELETE FROM repair_attachments WHERE id = ?", (attachment_id,))
 
         db.commit()
         flash("Reparatur-Eintrag wurde aktualisiert.", "erfolg")
-        return redirect(url_for("platine_detail", platine_id=rep["platine_id"]))
+        return redirect(url_for("board_detail", board_id=repair["board_id"]))
 
-    fotos = db.execute("SELECT * FROM reparatur_fotos WHERE reparatur_id = ?", (reparatur_id,)).fetchall()
-    return render_template("reparatur_bearbeiten.html", rep=rep, fotos=fotos)
+    attachments = db.execute(
+        "SELECT * FROM repair_attachments WHERE repair_id = ?", (repair_id,)
+    ).fetchall()
+    return render_template("edit_repair.html", repair=repair, attachments=attachments)
 
 
-@app.route("/platine/<int:platine_id>/loeschen", methods=["POST"])
-@permission_required("kann_loeschen")
-def platine_loeschen(platine_id):
+@app.route("/boards/<int:board_id>/delete", methods=["POST"])
+@permission_required("can_delete")
+def delete_board(board_id):
     db = get_db()
-    platine = db.execute("SELECT * FROM platinen WHERE id = ?", (platine_id,)).fetchone()
-    if platine is None:
+    board = db.execute("SELECT * FROM boards WHERE id = ?", (board_id,)).fetchone()
+    if board is None:
         abort(404)
-    db.execute("DELETE FROM platinen WHERE id = ?", (platine_id,))
+    db.execute("DELETE FROM boards WHERE id = ?", (board_id,))
     db.commit()
-    flash(f"Platine '{platine['seriennummer']}' wurde gelöscht.", "erfolg")
+    flash(f"Platine '{board['serial_number']}' wurde gelöscht.", "erfolg")
     return redirect(url_for("index"))
 
 
-@app.route("/uploads/<path:dateiname>")
+@app.route("/uploads/<path:filename>")
 @login_required
-def uploaded_file(dateiname):
-    return send_from_directory(app.config["UPLOAD_FOLDER"], dateiname)
+def uploaded_file(filename):
+    return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
 
 # ---------------------------------------------------------------------------
-# Start
+# Entry point
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":

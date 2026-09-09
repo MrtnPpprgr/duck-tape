@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}{{ board['serial_number'] }}{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('index') }}" class="link">← Zurück zur Übersicht</a>
+
+<section class="card board-head">
+    <div>
+        <h2 class="mono">{{ board['serial_number'] }}</h2>
+        <p class="muted">
+            {{ board['type_name'] or 'Kein Typ' }}
+            {% if board['version_name'] %} · Version {{ board['version_name'] }}{% endif %}
+            · angelegt am {{ board['created_at'][:10] }}
+            {% if board['created_by'] %} von {{ board['created_by'] }}{% endif %}
+        </p>
+    </div>
+    {% if current_user['is_admin'] or current_user['can_delete'] %}
+    <form action="{{ url_for('delete_board', board_id=board['id']) }}" method="post"
+          onsubmit="return confirm('Diese Platine inkl. gesamter Reparatur-Historie wirklich löschen?');">
+        <button type="submit" class="btn btn-danger">Platine löschen</button>
+    </form>
+    {% endif %}
+</section>
+
+{% if current_user['is_admin'] or current_user['can_edit_repairs'] %}
+<section class="card">
+    <h2>Neue Reparatur eintragen</h2>
+    <form action="{{ url_for('create_repair', board_id=board['id']) }}" method="post" enctype="multipart/form-data" class="form">
+        <div class="form-row">
+            <label>Datum
+                <input type="date" name="date" value="{{ today }}" required>
+            </label>
+            <label>Techniker
+                <input type="text" name="technician" placeholder="Name">
+            </label>
+            <label>Ersatzteile
+                <input type="text" name="parts" placeholder="z.B. Sicherung 2A, Kondensator 100uF">
+            </label>
+        </div>
+        <label>Fehlerbeschreibung
+            <textarea name="issue_description" rows="2" placeholder="Was war das Problem?"></textarea>
+        </label>
+        <label>Durchgeführte Reparatur / Maßnahme
+            <textarea name="action_taken" rows="2" placeholder="Was wurde gemacht?"></textarea>
+        </label>
+        <label>Anhänge (mehrere möglich)
+            <input type="file" name="attachments" multiple accept="image/*,.pdf">
+        </label>
+        <button type="submit" class="btn">Reparatur speichern</button>
+    </form>
+</section>
+{% else %}
+<section class="card">
+    <p class="muted">Du hast nur Ansichtsrechte und kannst keine Reparaturen erfassen.</p>
+</section>
+{% endif %}
+
+<section class="card">
+    <h2>Reparatur-Historie ({{ repairs|length }})</h2>
+    {% if repairs %}
+        <div class="timeline">
+        {% for entry in repairs %}
+            {% set repair = entry.repair %}
+            <div class="timeline-item">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                    <div class="timeline-header">
+                        <strong>{{ repair['date'] }}</strong>
+                        {% if repair['technician'] %}<span class="muted"> · {{ repair['technician'] }}</span>{% endif %}
+                        {% if current_user['is_admin'] or current_user['can_edit_repairs'] %}
+                            <a href="{{ url_for('edit_repair', repair_id=repair['id']) }}" class="link edit-link">Bearbeiten</a>
+                        {% endif %}
+                    </div>
+                    {% if repair['issue_description'] %}
+                        <p><strong>Fehler:</strong> {{ repair['issue_description'] }}</p>
+                    {% endif %}
+                    {% if repair['action_taken'] %}
+                        <p><strong>Maßnahme:</strong> {{ repair['action_taken'] }}</p>
+                    {% endif %}
+                    {% if repair['parts'] %}
+                        <p><strong>Ersatzteile:</strong> {{ repair['parts'] }}</p>
+                    {% endif %}
+                    {% if entry.attachments %}
+                        <div class="fotos">
+                            {% for attachment in entry.attachments %}
+                                {% if attachment['filename'].lower().endswith('.pdf') %}
+                                    <a href="{{ url_for('uploaded_file', filename=attachment['filename']) }}" target="_blank" class="pdf-link">📄 PDF öffnen</a>
+                                {% else %}
+                                    <a href="{{ url_for('uploaded_file', filename=attachment['filename']) }}" target="_blank">
+                                        <img src="{{ url_for('uploaded_file', filename=attachment['filename']) }}" alt="Anhang" class="thumb">
+                                    </a>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    {% if repair['updated_at'] %}
+                        <p class="muted small">zuletzt bearbeitet {{ repair['updated_at'][:16] }} von {{ repair['updated_by'] }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+        </div>
+    {% else %}
+        <p class="muted">Noch keine Reparaturen erfasst.</p>
+    {% endif %}
+</section>
+{% endblock %}

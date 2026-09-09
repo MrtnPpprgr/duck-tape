@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Mein Konto{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('index') }}" class="link">← Zurück zur Übersicht</a>
+
+<section class="card">
+    <h2>Mein Konto: {{ current_user['username'] }}</h2>
+    <p class="muted">
+        Berechtigungen:
+        {% if current_user['is_admin'] %}<span class="badge badge-warn">Admin (alle Rechte)</span>{% endif %}
+        {% if current_user['can_create'] %}<span class="badge">Platinen anlegen</span>{% endif %}
+        {% if current_user['can_delete'] %}<span class="badge">Platinen löschen</span>{% endif %}
+        {% if current_user['can_edit_repairs'] %}<span class="badge">Reparatur-Historie bearbeiten</span>{% endif %}
+        {% if not current_user['is_admin'] and not current_user['can_create'] and not current_user['can_delete'] and not current_user['can_edit_repairs'] %}
+            <span class="badge badge-ok">Nur Ansicht</span>
+        {% endif %}
+    </p>
+</section>
+
+<section class="card">
+    <h2>Passwort ändern</h2>
+    <form method="post" class="form">
+        <label>Aktuelles Passwort
+            <input type="password" name="current_password" required>
+        </label>
+        <label>Neues Passwort
+            <input type="password" name="new_password" required minlength="4">
+        </label>
+        <label>Neues Passwort wiederholen
+            <input type="password" name="new_password_repeat" required minlength="4">
+        </label>
+        <button type="submit" class="btn">Passwort ändern</button>
+    </form>
+</section>
+{% endblock %}
