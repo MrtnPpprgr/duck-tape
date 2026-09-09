@@ -11,7 +11,7 @@
                 <input type="text" name="serial_number" placeholder="{{ suggested_serial }} (leer lassen = automatisch)">
             </label>
 
-            <label>Platinen-Typ
+            <label>Typen-Bezeichnung
                 <select name="type_id" id="type_select">
                     <option value="">– bitte wählen –</option>
                     {% for t in types %}
@@ -65,7 +65,7 @@
                 <th>{{ sort_link('serial_number', 'Seriennummer') }}</th>
                 <th>{{ sort_link('type', 'Typ') }}</th>
                 <th>{{ sort_link('version', 'Version') }}</th>
-                <th>{{ sort_link('count', 'Anzahl Reparaturen') }}</th>
+                <th>{{ sort_link('count', 'Reparaturen') }}</th>
                 <th>{{ sort_link('last_repair', 'Letzte Reparatur') }}</th>
                 <th>{{ sort_link('created', 'Angelegt am') }}</th>
                 <th></th>

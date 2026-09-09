@@ -10,7 +10,7 @@ From other devices:      http://<PC-IP>:5000
 
 On first run a default admin account is created automatically:
     Username: admin
-    Password: admin123
+    Password: admin
 Please change the password right after the first login (see "Mein Konto")!
 """
 
@@ -129,11 +129,11 @@ def init_db():
                (username, password_hash, can_create, can_delete,
                 can_edit_repairs, is_admin, created_at)
                VALUES (?, ?, 1, 1, 1, 1, ?)""",
-            ("admin", generate_password_hash("admin123"),
+            ("admin", generate_password_hash("admin"),
              datetime.now().isoformat(timespec="seconds")),
         )
         db.commit()
-        print("\n*** Default admin account created: username 'admin', password 'admin123' ***")
+        print("\n*** Default admin account created: username 'admin', password 'admin' ***")
         print("*** Please change the password after the first login (see 'Mein Konto')! ***\n")
 
     db.close()
@@ -197,14 +197,14 @@ def login_required(f):
     return wrapper
 
 
-def permission_required(perm):
+def permission_required(*perms):
     """perm: 'can_create' | 'can_delete' | 'can_edit_repairs' | 'is_admin'"""
     def decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
             if g.user is None:
                 return redirect(url_for("login", next=request.path))
-            if not (g.user["is_admin"] or g.user[perm]):
+            if not (g.user["is_admin"] or any(g.user[p] for p in perms)):
                 flash("Du hast keine Berechtigung für diese Aktion – nur Ansicht möglich.", "fehler")
                 return redirect(request.referrer or url_for("index"))
             return f(*args, **kwargs)
@@ -515,7 +515,7 @@ def board_detail(board_id):
 
 
 @app.route("/boards/<int:board_id>/repairs", methods=["POST"])
-@permission_required("can_edit_repairs")
+@permission_required("can_edit_repairs", "can_create")
 def create_repair(board_id):
     db = get_db()
     board = db.execute("SELECT * FROM boards WHERE id = ?", (board_id,)).fetchone()
