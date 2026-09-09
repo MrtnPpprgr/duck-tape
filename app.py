@@ -105,6 +105,8 @@ def init_db():
             action_taken        TEXT,
             technician          TEXT,
             parts               TEXT,
+            ticket              TEXT,
+            customer            TEXT,
             created_at          TEXT NOT NULL,
             updated_at          TEXT,
             updated_by          TEXT,
@@ -527,12 +529,14 @@ def create_repair(board_id):
     action_taken = request.form.get("action_taken", "").strip()
     technician = request.form.get("technician", "").strip()
     parts = request.form.get("parts", "").strip()
-
+    ticket = request.form.get("ticket", "").strip()
+    customer = request.form.get("customer", "").strip()
+    
     cur = db.execute(
         """INSERT INTO repairs
-           (board_id, date, issue_description, action_taken, technician, parts, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
-        (board_id, date, issue_description, action_taken, technician, parts,
+           (board_id, date, issue_description, action_taken, technician, parts, ticket, customer, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (board_id, date, issue_description, action_taken, technician, parts, ticket, customer,
          datetime.now().isoformat(timespec="seconds")),
     )
     repair_id = cur.lastrowid

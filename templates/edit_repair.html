@@ -11,13 +11,21 @@
             <label>Datum
                 <input type="date" name="date" value="{{ repair['date'] }}" required>
             </label>
+            <label>Ticket ID
+                <input type="text" name="ticket" placeholder="Ticket ID">
+            </label>           
+            <label>Kunde
+                <input type="text" name="customer" placeholder="Albert Einstein">
+            </label>
+        </div>
+        <div class="form-row">
             <label>Techniker
                 <input type="text" name="technician" value="{{ repair['technician'] or '' }}">
             </label>
             <label>Ersatzteile
                 <input type="text" name="parts" value="{{ repair['parts'] or '' }}">
             </label>
-        </div>
+        </div> 
         <label>Fehlerbeschreibung
             <textarea name="issue_description" rows="2">{{ repair['issue_description'] or '' }}</textarea>
         </label>

@@ -30,6 +30,14 @@
             <label>Datum
                 <input type="date" name="date" value="{{ today }}" required>
             </label>
+            <label>Ticket ID
+                <input type="text" name="ticket" placeholder="Ticket ID">
+            </label>           
+            <label>Kunde
+                <input type="text" name="customer" placeholder="Albert Einstein">
+            </label>
+        </div>
+        <div class="form-row">
             <label>Techniker
                 {% if current_user['is_admin'] or current_user['can_edit_repairs']%}
                     <input type="text" name="technician" value="{{ current_user['username'] }}">
@@ -40,7 +48,7 @@
             <label>Ersatzteile
                 <input type="text" name="parts" placeholder="z.B. Sicherung 2A, Kondensator 100uF">
             </label>
-        </div>
+        </div>      
         <label>Fehlerbeschreibung
             <textarea name="issue_description" rows="2" placeholder="Was war das Problem?"></textarea>
         </label>
@@ -86,6 +94,12 @@
                     {% endif %}
                     {% if repair['technician'] %}
                         <p><strong>Techniker:</strong> {{ repair['technician'] }}</p>
+                    {% endif %}
+                    {% if repair['ticket'] %}
+                        <p><strong>Ticket ID:</strong> {{ repair['ticket'] }}</p>
+                    {% endif %}
+                    {% if repair['customer'] %}
+                        <p><strong>Kunde:</strong> {{ repair['customer'] }}</p>
                     {% endif %}
                     {% if entry.attachments %}
                         <div class="fotos">
