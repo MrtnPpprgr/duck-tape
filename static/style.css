@@ -382,19 +382,3 @@ a.mono:hover { color: var(--primary); }
 }
 
 .small { font-size: 0.8rem; }
-
-.file-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 0;
-}
-.file-name {     
-    display: inline-block;
-    padding: 6px 10px;
-    background: #f3f4f6;
-    border-radius: 6px;
-    font-size: 0.85rem;
-    text-decoration: none;
-    color: var(--text); 
-}
