@@ -465,8 +465,9 @@ def create_board():
     )
     db.commit()
     flash(f"Platine '{serial_number}' wurde angelegt.", "erfolg")
-    # Jump straight to the repair page of the newly created board
-    return redirect(url_for("board_detail", board_id=cur.lastrowid))
+    if request.form.get("AddButton") == "create_and_add":
+        return redirect(url_for("board_detail", board_id=cur.lastrowid))
+    return redirect(url_for("index"))
 
 
 @app.route("/types/<int:type_id>/versions")

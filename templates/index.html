@@ -30,7 +30,10 @@
             </label>
             <input type="text" name="new_version" id="new_version" placeholder="Name der neuen Version" style="display:none;">
 
-            <button type="submit" class="btn">Platine anlegen &amp; Reparatur erfassen</button>
+            <div style="display: flex;">
+            <button type="submit" name="AddButton" value="create" class="btn">Platine anlegen</button>
+            <button type="submit" name="AddButton" value="create_and_add" class="btn"> Reparatur erfassen</button>
+            </div>
         </form>
     </section>
     {% endif %}
