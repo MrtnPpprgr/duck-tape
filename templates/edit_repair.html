@@ -32,29 +32,28 @@
         <label>Durchgeführte Reparatur / Maßnahme
             <textarea name="action_taken" rows="2">{{ repair['action_taken'] or '' }}</textarea>
         </label>
-
         {% if attachments %}
-        <div>
-            <span class="label-like">Vorhandene Anhänge (Häkchen = löschen)</span>
-            <div class="fotos">
                 {% for attachment in attachments %}
-                    <div class="foto-mit-loeschen">
-                        {% if attachment['filename'].lower().endswith('.pdf') %}
-                            <a href="{{ url_for('uploaded_file', filename=attachment['filename']) }}" target="_blank" class="pdf-link">📄 PDF</a>
-                        {% else %}
-                            <a href="{{ url_for('uploaded_file', filename=attachment['filename']) }}" target="_blank">
-                                <img src="{{ url_for('uploaded_file', filename=attachment['filename']) }}" alt="Anhang" class="thumb">
-                            </a>
-                        {% endif %}
-                        <label class="checkbox small"><input type="checkbox" name="delete_attachment" value="{{ attachment['id'] }}"> löschen</label>
+                    <div class="fotos">
+                    {% set ext = attachment['filename'].rsplit('.', 1)[-1].lower() %}
+                    {% if ext in ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] %}
+                        <a href="{{ url_for('uploaded_file', filename=attachment['filename']) }}" target="_blank">
+                            <img src="{{ url_for('uploaded_file', filename=attachment['filename']) }}" alt="{{ attachment['filename'] }}" class="thumb">
+                        </a>
+                    {% elif ext == 'pdf' %}
+                        <a href="{{ url_for('uploaded_file', filename=attachment['filename']) }}" target="_blank" class="pdf-link">📄 {{ attachment['filename'].split('_', 3)[-1] }}</a>
+                    {% else %}
+                        <div class="file-item">
+                            <a href="{{ url_for('download_file', filename=attachment['filename']) }}" class="file-name">📎 {{ attachment['filename'].split('_', 3)[-1] }}</a>
+                        </div>
+                    {% endif %}
+                    <label class="checkbox small"><input type="checkbox" name="delete_attachment" value="{{ attachment['id'] }}"> löschen</label>
                     </div>
                 {% endfor %}
-            </div>
-        </div>
         {% endif %}
 
         <label>Weitere Anhänge hinzufügen
-            <input type="file" name="attachments" multiple accept="image/*,.pdf">
+            <input type="file" name="attachments" multiple>
         </label>
 
         {% if repair['updated_at'] %}

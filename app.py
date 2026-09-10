@@ -27,7 +27,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE = os.path.join(BASE_DIR, "repairs.db")
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "uploads")
-ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "pdf"}
+BLOCKED_EXTENSIONS = {"exe", "bat", "cmd", "sh", "msi", "com", "scr", "js", "vbs", "ps1"}
+
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "duck-tape-secret-key-please-change-if-needed"
@@ -153,7 +154,9 @@ def next_serial_number(db):
 
 
 def allowed_file(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+    if "." not in filename:
+        return True
+    return filename.rsplit(".", 1)[1].lower() not in BLOCKED_EXTENSIONS
 
 
 def get_or_create_type(db, name):
@@ -629,6 +632,11 @@ def delete_board(board_id):
 @login_required
 def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+
+@app.route("/uploads/<path:filename>/download")
+@login_required
+def download_file(filename):
+    return send_from_directory(app.config["UPLOAD_FOLDER"], filename, as_attachment=True)
 
 
 # ---------------------------------------------------------------------------

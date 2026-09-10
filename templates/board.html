@@ -56,7 +56,7 @@
             <textarea name="action_taken" rows="2" placeholder="Was wurde gemacht?"></textarea>
         </label>
         <label>Anhänge (mehrere möglich)
-            <input type="file" name="attachments" multiple accept="image/*,.pdf">
+            <input type="file" name="attachments" multiple>
         </label>
         <button type="submit" class="btn">Reparatur speichern</button>
     </form>
@@ -104,12 +104,17 @@
                     {% if entry.attachments %}
                         <div class="fotos">
                             {% for attachment in entry.attachments %}
-                                {% if attachment['filename'].lower().endswith('.pdf') %}
-                                    <a href="{{ url_for('uploaded_file', filename=attachment['filename']) }}" target="_blank" class="pdf-link">📄 PDF öffnen</a>
-                                {% else %}
+                                {% set ext = attachment['filename'].rsplit('.', 1)[-1].lower() %}
+                                {% if ext in ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] %}
                                     <a href="{{ url_for('uploaded_file', filename=attachment['filename']) }}" target="_blank">
-                                        <img src="{{ url_for('uploaded_file', filename=attachment['filename']) }}" alt="Anhang" class="thumb">
+                                        <img src="{{ url_for('uploaded_file', filename=attachment['filename']) }}" alt="{{ attachment['filename'] }}" class="thumb">
                                     </a>
+                                {% elif ext == 'pdf' %}
+                                    <a href="{{ url_for('uploaded_file', filename=attachment['filename']) }}" target="_blank" class="pdf-link">📄 {{ attachment['filename'].split('_', 3)[-1] }}</a>
+                                {% else %}
+                                    <div class="file-item">
+                                        <a href="{{ url_for('download_file', filename=attachment['filename']) }}" class="file-name">📎 {{ attachment['filename'].split('_', 3)[-1] }}</a>
+                                    </div>
                                 {% endif %}
                             {% endfor %}
                         </div>
