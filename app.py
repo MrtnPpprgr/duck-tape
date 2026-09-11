@@ -16,11 +16,13 @@ Please change the password right after the first login (see "Mein Konto")!
 
 import os
 import sqlite3
+import qrcode
+from io import BytesIO
 from datetime import datetime
 from functools import wraps
 
 from flask import (Flask, g, render_template, request, redirect,
-                    url_for, flash, send_from_directory, abort, session)
+                    url_for, flash, send_from_directory, abort, session, send_file)
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -630,6 +632,25 @@ def delete_board(board_id):
 @login_required
 def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+
+
+@app.route("/boards/<int:board_id>/qrcode.png")
+@login_required
+def board_qrcode(board_id):
+    db = get_db()
+    board = db.execute("SELECT * FROM boards WHERE id = ?", (board_id,)).fetchone()
+    if board is None:
+        abort(404)
+
+    ## QR-Code to Repair Site (Settings)
+    #qr_content = request.host_url.rstrip("/") + url_for("board_detail", board_id=board_id)
+    ## QR-Code = serialnumber
+    qr_content = board["serial_number"]
+    img = qrcode.make(qr_content, box_size=8, border=2)
+    buffer = BytesIO()
+    img.save(buffer, format="PNG")
+    buffer.seek(0)
+    return send_file(buffer, mimetype="image/png")
 
 
 # ---------------------------------------------------------------------------
