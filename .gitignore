@@ -1,4 +1,4 @@
-
+*.bak
 *.db
 **/static/uploads/
 
