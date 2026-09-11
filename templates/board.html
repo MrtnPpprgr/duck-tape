@@ -1,16 +1,3 @@
-<script>
-    function generateBarCode() 
-    {
-        var nric = $('#text').val();
-        var url = 'https://api.qrserver.com/v1/create-qr-code/?data=' + nric + '&amp;size=50x50';
-        $('#barcode').attr('src', url);
-    }
-</script>
-
-
-
-
-
 {% extends "base.html" %}
 {% block title %}{{ board['serial_number'] }}{% endblock %}
 
@@ -19,14 +6,13 @@
 
 <section class="card board-head">
     <div>
-  
-        <h2 class="mono">{{ board['serial_number'] }}</h2>  
+        <h2 class="mono">{{ board['serial_number'] }}</h2>
         <p class="muted">
             {{ board['type_name'] or 'Kein Typ' }}
             {% if board['version_name'] %} · Version {{ board['version_name'] }}{% endif %}
             · angelegt am {{ board['created_at'][:10] }}
             {% if board['created_by'] %} von {{ board['created_by'] }}{% endif %}
-        </p>  
+        </p>
     </div>
     <div class="qr-box">       
         <a href="{{ url_for('board_qrcode', board_id=board['id']) }}" download="{{ board['serial_number'] }}.png" class="link">
@@ -68,7 +54,7 @@
             <label>Ersatzteile
                 <input type="text" name="parts" placeholder="z.B. Sicherung 2A, Kondensator 100uF">
             </label>
-        </div>      
+        </div>
         <label>Fehlerbeschreibung
             <textarea name="issue_description" rows="2" placeholder="Was war das Problem?"></textarea>
         </label>

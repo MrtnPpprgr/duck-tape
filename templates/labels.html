@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Etiketten{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('index') }}" class="link">← Zurück zur Übersicht</a>
+
+
+
+<section class="card">
+    <h2>Etiketten drucken (DIN A4)</h2>
+    <p class="muted">
+        Erzeugt eine PDF-Seite mit QR-Code-Etiketten zum Ausdrucken auf DIN-A4-Etikettenbögen.
+        Die Seriennummern werden ab der angegebenen Start-Nummer hochgezählt; bereits vergebene
+        Nummern werden automatisch übersprungen.
+    </p>
+
+    <form action="{{ url_for('labels_generate') }}" method="post" class="form" id="labels-form">
+
+        <h3>Seriennummern</h3>
+        <div class="form-row">
+            <label>Start-Seriennummer
+                <input type="text" name="start_serial" id="start_serial"
+                       value="{{ suggested_serial }}" required>
+            </label>
+            <label>Anzahl Etiketten
+                <input type="number" name="count" id="count" value="{{ defaults.count }}" min="1" max="500" required>
+            </label>
+            <label>Startposition auf dem Bogen
+                <input type="number" name="start_position" id="start_position"
+                       value="{{ defaults.start_position }}" min="1" required>
+            </label>
+        </div>
+        <p class="muted small">
+            Startposition = an welcher Stelle im Raster (links oben = 1, dann zeilenweise weiter)
+            begonnen werden soll praktisch, wenn ein Etikettenbogen schon teilweise benutzt ist.
+        </p>
+
+        <h3>Etikettengruppe</h3>
+        <div class="form-row">
+            <label>Breite (mm)
+                <input type="number" step="0.5" name="label_width" id="label_width" value="{{ defaults.label_width }}" min="5" required>
+            </label>
+            <label>Höhe (mm)
+                <input type="number" step="0.5" name="label_height" id="label_height" value="{{ defaults.label_height }}" min="5" required>
+            </label>
+        </div>
+
+        <h3>Abstand zwischen den Etiketten</h3>
+        <div class="form-row">
+            <label>Abstand horizontal (mm)
+                <input type="number" step="0.5" name="gap_x" id="gap_x" value="{{ defaults.gap_x }}" min="0" required>
+            </label>
+            <label>Abstand vertikal (mm)
+                <input type="number" step="0.5" name="gap_y" id="gap_y" value="{{ defaults.gap_y }}" min="0" required>
+            </label>
+        </div>
+
+        <h3>Seitenrand (Bogen-Rand)</h3>
+        <div class="form-row">
+            <label>Oben (mm)
+                <input type="number" step="0.5" name="margin_top" id="margin_top" value="{{ defaults.margin_top }}" min="0" required>
+            </label>
+            <label>Unten (mm)
+                <input type="number" step="0.5" name="margin_bottom" id="margin_bottom" value="{{ defaults.margin_bottom }}" min="0" required>
+            </label>
+        </div>
+        <div class="form-row">
+            <label>Links (mm)
+                <input type="number" step="0.5" name="margin_left" id="margin_left" value="{{ defaults.margin_left }}" min="0" required>
+            </label>
+            <label>Rechts (mm)
+                <input type="number" step="0.5" name="margin_right" id="margin_right" value="{{ defaults.margin_right }}" min="0" required>
+            </label>
+        </div>
+
+        <div class="grid-preview-box">
+            <p class="muted small" id="grid-info">Raster wird berechnet...</p>
+            <div class="grid-preview" id="grid-preview"></div>
+        </div>
+
+        <button type="submit" class="btn">PDF erzeugen &amp; herunterladen</button>
+    </form>
+</section>
+
+<script>
+(function () {
+    const fields = ["label_width", "label_height", "gap_x", "gap_y",
+                     "margin_top", "margin_bottom", "margin_left", "margin_right"];
+    const startPositionInput = document.getElementById("start_position");
+    const gridInfo = document.getElementById("grid-info");
+    const gridPreview = document.getElementById("grid-preview");
+
+    let currentColumns = {{ columns }};
+    let currentRows = {{ rows }};
+
+    function renderGrid(columns, rows) {
+        gridPreview.innerHTML = "";
+        gridPreview.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
+        const total = columns * rows;
+        const startPos = parseInt(startPositionInput.value || "1", 10);
+        for (let i = 1; i <= total; i++) {
+            const cell = document.createElement("div");
+            cell.className = "grid-cell" + (i >= startPos ? " grid-cell-active" : "");
+            cell.textContent = i;
+            gridPreview.appendChild(cell);
+        }
+    }
+
+    function updateGrid() {
+        const params = new URLSearchParams();
+        fields.forEach((id) => params.set(id, document.getElementById(id).value || 0));
+
+        fetch("{{ url_for('labels_preview_grid') }}?" + params.toString())
+            .then((r) => r.json())
+            .then((data) => {
+                currentColumns = data.columns;
+                currentRows = data.rows;
+                gridInfo.textContent = data.per_page > 0
+                    ? `${data.columns} Spalten ${data.rows} Zeilen = ${data.per_page} Etiketten pro Seite`
+                    : "Mit diesen Maßen passt kein Etikett auf die Seite.";
+                renderGrid(data.columns, data.rows);
+            })
+            .catch(() => {
+                gridInfo.textContent = "Vorschau konnte nicht berechnet werden.";
+            });
+    }
+
+    fields.forEach((id) => document.getElementById(id).addEventListener("input", updateGrid));
+    startPositionInput.addEventListener("input", () => renderGrid(currentColumns, currentRows));
+
+    renderGrid(currentColumns, currentRows);
+})();
+</script>
+{% endblock %}

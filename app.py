@@ -15,11 +15,19 @@ Please change the password right after the first login (see "Mein Konto")!
 """
 
 import os
+import re
 import sqlite3
 import qrcode
 from io import BytesIO
 from datetime import datetime
 from functools import wraps
+from io import BytesIO
+
+import qrcode
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas as pdf_canvas
 
 from flask import (Flask, g, render_template, request, redirect,
                     url_for, flash, send_from_directory, abort, session, send_file)
@@ -156,8 +164,41 @@ def next_serial_number(db):
         suffix = row["serial_number"].rsplit("-", 1)[-1]
         if suffix.isdigit():
             highest_number = max(highest_number, int(suffix))
-
     return f"PL-{year}-{highest_number + 1:04d}"
+
+
+def split_serial_pattern(serial):
+    """Split a serial number into (prefix, numeric_part_as_string).
+    e.g. 'PL-2026-0010' -> ('PL-2026-', '0010'). Returns (serial, None) if no
+    trailing digits are found."""
+    match = re.match(r"^(.*?)(\d+)$", serial)
+    if not match:
+        return serial, None
+    return match.group(1), match.group(2)
+
+
+def generate_available_serials(db, start_serial, count):
+    """Starting from start_serial, count upward and return `count` serial
+    numbers that do not yet exist in the database (case-insensitive),
+    skipping over any that are already taken."""
+    prefix, digits = split_serial_pattern(start_serial)
+    if digits is None:
+        raise ValueError("Die Start-Seriennummer muss am Ende eine Zahl enthalten.")
+
+    width = len(digits)
+    number = int(digits)
+    result = []
+
+    while len(result) < count:
+        candidate = f"{prefix}{number:0{width}d}"
+        exists = db.execute(
+            "SELECT 1 FROM boards WHERE serial_number = ? COLLATE NOCASE", (candidate,)
+        ).fetchone()
+        if not exists:
+            result.append(candidate)
+        number += 1
+
+    return result
 
 
 def allowed_file(filename):
@@ -640,6 +681,12 @@ def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
 
+@app.route("/uploads/<path:filename>/download")
+@login_required
+def download_file(filename):
+    return send_from_directory(app.config["UPLOAD_FOLDER"], filename, as_attachment=True)
+
+
 @app.route("/boards/<int:board_id>/qrcode.png")
 @login_required
 def board_qrcode(board_id):
@@ -657,6 +704,167 @@ def board_qrcode(board_id):
     img.save(buffer, format="PNG")
     buffer.seek(0)
     return send_file(buffer, mimetype="image/png")
+
+
+# ---------------------------------------------------------------------------
+# Label sheet generator (QR code stickers as a DIN A4 PDF)
+# ---------------------------------------------------------------------------
+
+LABEL_DEFAULTS = {
+    "label_width": 40, "label_height": 20,
+    "gap_x": 2, "gap_y": 2,
+    "margin_top": 10, "margin_bottom": 10, "margin_left": 10, "margin_right": 10,
+    "count": 10, "start_position": 1,
+}
+
+
+def compute_label_grid(label_width, label_height, gap_x, gap_y,
+                        margin_top, margin_bottom, margin_left, margin_right):
+    """Work out how many label columns/rows fit on one A4 page for the
+    given sizes (all values in millimetres)."""
+    page_width_mm = A4[0] / mm
+    page_height_mm = A4[1] / mm
+
+    usable_width = page_width_mm - margin_left - margin_right
+    usable_height = page_height_mm - margin_top - margin_bottom
+
+    columns = max(1, int((usable_width + gap_x) // (label_width + gap_x)))
+    rows = max(1, int((usable_height + gap_y) // (label_height + gap_y)))
+    return columns, rows
+
+
+@app.route("/labels")
+@permission_required("can_create")
+def labels_page():
+    db = get_db()
+    suggested_serial = next_serial_number(db)
+    columns, rows = compute_label_grid(
+        LABEL_DEFAULTS["label_width"], LABEL_DEFAULTS["label_height"],
+        LABEL_DEFAULTS["gap_x"], LABEL_DEFAULTS["gap_y"],
+        LABEL_DEFAULTS["margin_top"], LABEL_DEFAULTS["margin_bottom"],
+        LABEL_DEFAULTS["margin_left"], LABEL_DEFAULTS["margin_right"],
+    )
+    return render_template(
+        "labels.html", defaults=LABEL_DEFAULTS, suggested_serial=suggested_serial,
+        columns=columns, rows=rows,
+    )
+
+
+@app.route("/labels/preview-grid")
+@permission_required("can_create")
+def labels_preview_grid():
+    """Small JSON helper so the form can live-update the columns/rows preview."""
+    try:
+        columns, rows = compute_label_grid(
+            float(request.args.get("label_width", 40)),
+            float(request.args.get("label_height", 20)),
+            float(request.args.get("gap_x", 2)),
+            float(request.args.get("gap_y", 2)),
+            float(request.args.get("margin_top", 10)),
+            float(request.args.get("margin_bottom", 10)),
+            float(request.args.get("margin_left", 10)),
+            float(request.args.get("margin_right", 10)),
+        )
+    except (TypeError, ValueError):
+        return {"columns": 0, "rows": 0, "per_page": 0}
+    return {"columns": columns, "rows": rows, "per_page": columns * rows}
+
+
+@app.route("/labels/generate", methods=["POST"])
+@permission_required("can_create")
+def labels_generate():
+    db = get_db()
+
+    try:
+        label_width = float(request.form.get("label_width"))
+        label_height = float(request.form.get("label_height"))
+        gap_x = float(request.form.get("gap_x"))
+        gap_y = float(request.form.get("gap_y"))
+        margin_top = float(request.form.get("margin_top"))
+        margin_bottom = float(request.form.get("margin_bottom"))
+        margin_left = float(request.form.get("margin_left"))
+        margin_right = float(request.form.get("margin_right"))
+        count = int(request.form.get("count"))
+        start_position = int(request.form.get("start_position"))
+        start_serial = request.form.get("start_serial", "").strip()
+    except (TypeError, ValueError):
+        flash("Bitte alle Felder mit gültigen Zahlen ausfüllen.", "fehler")
+        return redirect(url_for("labels_page"))
+
+    if not start_serial:
+        flash("Bitte eine Start-Seriennummer angeben.", "fehler")
+        return redirect(url_for("labels_page"))
+    if count < 1 or count > 500:
+        flash("Anzahl muss zwischen 1 und 500 liegen.", "fehler")
+        return redirect(url_for("labels_page"))
+    if start_position < 1:
+        flash("Startposition muss mindestens 1 sein.", "fehler")
+        return redirect(url_for("labels_page"))
+
+    columns, rows = compute_label_grid(
+        label_width, label_height, gap_x, gap_y,
+        margin_top, margin_bottom, margin_left, margin_right,
+    )
+    labels_per_page = columns * rows
+    if start_position > labels_per_page:
+        flash(f"Startposition ({start_position}) liegt außerhalb des Rasters "
+              f"({labels_per_page} Etiketten pro Seite).", "fehler")
+        return redirect(url_for("labels_page"))
+
+    try:
+        serials = generate_available_serials(db, start_serial, count)
+    except ValueError as e:
+        flash(str(e), "fehler")
+        return redirect(url_for("labels_page"))
+
+    page_width, page_height = A4
+    buffer = BytesIO()
+    c = pdf_canvas.Canvas(buffer, pagesize=A4)
+
+    position = start_position
+    is_first_label = True
+
+    for serial in serials:
+        pos_on_page = (position - 1) % labels_per_page
+        if pos_on_page == 0 and not is_first_label:
+            c.showPage()
+        is_first_label = False
+
+        col = pos_on_page % columns
+        row = pos_on_page // columns
+
+        x = (margin_left + col * (label_width + gap_x)) * mm
+        y = page_height - (margin_top + (row + 1) * label_height + row * gap_y) * mm
+
+        # QR code
+        qr_img = qrcode.make(serial, box_size=6, border=1)
+        qr_buffer = BytesIO()
+        qr_img.save(qr_buffer, format="PNG")
+        qr_buffer.seek(0)
+
+        qr_size = min(label_width, label_height) * 0.8 * mm
+        qr_y = y + (label_height * mm - qr_size) / 2
+        c.drawImage(ImageReader(qr_buffer), x + 1 * mm, qr_y,
+                    width=qr_size, height=qr_size, mask="auto")
+
+        # Serial number text next to the QR code
+        c.setFont("Helvetica", 7)
+        text_x = x + qr_size + 3 * mm
+        text_y = y + label_height * mm / 2
+        c.drawString(text_x, text_y, serial)
+
+        # Outline for cutting/alignment help
+        c.setLineWidth(0.2)
+        c.rect(x, y, label_width * mm, label_height * mm)
+
+        position += 1
+
+    c.save()
+    buffer.seek(0)
+    return send_file(
+        buffer, mimetype="application/pdf", as_attachment=True,
+        download_name="etiketten.pdf",
+    )
 
 
 # ---------------------------------------------------------------------------

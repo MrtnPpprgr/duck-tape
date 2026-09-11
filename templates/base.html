@@ -14,6 +14,9 @@
             {% if current_user['is_admin'] %}
                 <a href="{{ url_for('users_list') }}">Benutzerverwaltung</a>
             {% endif %}
+            {% if current_user['is_admin'] or current_user['can_create'] %}
+                <a href="{{ url_for('labels_page') }}">Etiketten drucken</a>
+            {% endif %}
             <a href="{{ url_for('account') }}">Mein Konto</a>
             <span class="nav-user">{{ current_user['username'] }}
                 {% if current_user['is_admin'] %}<span class="rolle rolle-admin">Admin</span>
