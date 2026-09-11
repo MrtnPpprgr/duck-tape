@@ -383,3 +383,33 @@ a.mono:hover { color: var(--primary); }
 }
 
 .small { font-size: 0.8rem; }
+
+
+.qr-box {
+    align-self: right;
+    text-align: center;
+    font-size: 0.8rem;
+    padding-left: 4px;
+    padding-bottom: 4px;
+    border-left: 1px solid var(--border);
+    background-color: lightgray;
+    border-radius: 10px;
+}
+
+
+.qr-code {
+    align-self: right;
+    width: 80px;
+    height: 80px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    transition: transform 0.4s ease-in-out;
+    border-radius: 6px;
+    
+}
+
+
+.qr-code:hover {
+  transform: scale(1.01);
+  opacity: 0.5;
+}
