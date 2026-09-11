@@ -14,11 +14,17 @@
             {% if board['created_by'] %} von {{ board['created_by'] }}{% endif %}
         </p>
     </div>
+    {% if current_user['is_admin'] or current_user['can_create'] %}
     <div class="qr-box">       
-        <a href="{{ url_for('board_qrcode', board_id=board['id']) }}" download="{{ board['serial_number'] }}.png" class="link">
+        <a href="{{ url_for('labels_page', suggested_serial= board['serial_number']) }}">
             <img src="{{ url_for('board_qrcode', board_id=board['id']) }}" alt="QR-Serialnumber" class="qr-code">
         </a>
     </div>
+    {% else %}
+    <div >       
+        <img src="{{ url_for('board_qrcode', board_id=board['id']) }}" alt="QR-Serialnumber" class="qr-code-onlyview">
+    </div>
+    {% endif %}
     
     {% if current_user['is_admin'] or current_user['can_delete'] %}
     <form action="{{ url_for('delete_board', board_id=board['id']) }}" method="post"

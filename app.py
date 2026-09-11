@@ -714,7 +714,7 @@ LABEL_DEFAULTS = {
     "label_width": 40, "label_height": 20,
     "gap_x": 2, "gap_y": 2,
     "margin_top": 10, "margin_bottom": 10, "margin_left": 10, "margin_right": 10,
-    "count": 10, "start_position": 1,
+    "count": 1, "start_position": 1,
 }
 
 
@@ -737,7 +737,9 @@ def compute_label_grid(label_width, label_height, gap_x, gap_y,
 @permission_required("can_create")
 def labels_page():
     db = get_db()
-    suggested_serial = next_serial_number(db)
+    suggested_serial = request.args.get("suggested_serial")
+    if suggested_serial is None:
+        suggested_serial = next_serial_number(db)
     columns, rows = compute_label_grid(
         LABEL_DEFAULTS["label_width"], LABEL_DEFAULTS["label_height"],
         LABEL_DEFAULTS["gap_x"], LABEL_DEFAULTS["gap_y"],

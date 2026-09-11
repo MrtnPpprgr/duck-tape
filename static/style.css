@@ -389,29 +389,33 @@ a.mono:hover { color: var(--primary); }
     align-self: right;
     text-align: center;
     font-size: 0.8rem;
-    padding-left: 4px;
-    padding-bottom: 4px;
-    border-left: 1px solid var(--border);
     background-color: lightgray;
     border-radius: 10px;
+    transition: transform 0.25s ease-in-out;
+}
+.qr-box:hover {
+    transform: scale(1.4);
 }
 
-
 .qr-code {
-    align-self: right;
     width: 80px;
     height: 80px;
     border: 1px solid var(--border);
     border-radius: 10px;
-    transition: transform 0.4s ease-in-out;
+    transition: transform 0.25s ease-in-out;
     border-radius: 6px;
-    
 }
 
-
 .qr-code:hover {
-  transform: scale(1.01);
   opacity: 0.5;
+}
+
+.qr-code-onlyview {
+    width: 80px;
+    height: 80px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    border-radius: 6px;
 }
 
 /* --- Etiketten-Vorschau --- */
@@ -456,4 +460,73 @@ a.mono:hover { color: var(--primary); }
 .form h3:first-of-type {
     border-top: none;
     padding-top: 0;
+}
+
+/* --- Etikett-Inhalt-Editor --- */
+
+.editor-layout {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    margin: 12px 0 4px;
+}
+
+.editor-canvas-wrap {
+    flex-shrink: 0;
+}
+
+.label-editor-canvas {
+    position: relative;
+    background: #fafafa;
+    border: 2px dashed var(--border);
+    overflow: hidden;
+}
+
+.editor-box {
+    position: absolute;
+    cursor: move;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    white-space: nowrap;
+}
+
+.editor-box-qr {
+    background: repeating-linear-gradient(45deg, #111827, #111827 3px, #ffffff 3px, #ffffff 6px);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    border: 1px solid #111827;
+}
+
+.editor-box-text {
+    background: #dbeafe;
+    border: 1px dashed var(--primary);
+    padding: 1px 4px;
+    color: var(--primary-dark);
+}
+
+.editor-controls {
+    flex: 1;
+    min-width: 260px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.small-row label {
+    font-size: 0.78rem;
+}
+.small-row input {
+    padding: 4px 6px;
+}
+
+.btn-small {
+    padding: 4px 10px;
+    font-size: 0.78rem;
 }
