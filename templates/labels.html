@@ -32,10 +32,10 @@
         <h3>Etikettengröße</h3>
         <div class="form-row">
             <label>Breite (mm)
-                <input type="number" step="0.5" name="label_width" id="tpl_label_width" value="{{ defaults.label_width }}" min="5" required>
+                <input type="number" step="0.1" name="label_width" id="tpl_label_width" value="{{ defaults.label_width }}" min="5" required>
             </label>
             <label>Höhe (mm)
-                <input type="number" step="0.5" name="label_height" id="tpl_label_height" value="{{ defaults.label_height }}" min="5" required>
+                <input type="number" step="0.1" name="label_height" id="tpl_label_height" value="{{ defaults.label_height }}" min="5" required>
             </label>
         </div>
 
@@ -60,9 +60,9 @@
                         <input type="checkbox" name="show_qr" id="tpl_show_qr" checked> QR-Code anzeigen
                     </label>
                     <div class="form-row small-row">
-                        <label>X (mm)<input type="number" step="0.5" name="qr_x" id="tpl_qr_x" value="1"></label>
-                        <label>Y (mm)<input type="number" step="0.5" name="qr_y" id="tpl_qr_y" value="1"></label>
-                        <label>Größe (mm)<input type="number" step="0.5" name="qr_size" id="tpl_qr_size" value="16"></label>
+                        <label>X (mm)<input type="number" step="0.1" name="qr_x" id="tpl_qr_x" value="1"></label>
+                        <label>Y (mm)<input type="number" step="0.1" name="qr_y" id="tpl_qr_y" value="1"></label>
+                        <label>Größe (mm)<input type="number" step="0.1" name="qr_size" id="tpl_qr_size" value="16"></label>
                     </div>
                 </div>
 
@@ -71,9 +71,9 @@
                         <input type="checkbox" name="show_serial" id="tpl_show_serial" checked> Seriennummer anzeigen
                     </label>
                     <div class="form-row small-row">
-                        <label>X (mm)<input type="number" step="0.5" name="serial_x" id="tpl_serial_x" value="20"></label>
-                        <label>Y (mm)<input type="number" step="0.5" name="serial_y" id="tpl_serial_y" value="12"></label>
-                        <label>Schriftgröße (pt)<input type="number" step="0.5" name="serial_font_size" id="tpl_serial_font_size" value="7"></label>
+                        <label>X (mm)<input type="number" step="0.1" name="serial_x" id="tpl_serial_x" value="20"></label>
+                        <label>Y (mm)<input type="number" step="0.1" name="serial_y" id="tpl_serial_y" value="12"></label>
+                        <label>Schriftgröße (pt)<input type="number" step="0.1" name="serial_font_size" id="tpl_serial_font_size" value="7"></label>
                     </div>
                 </div>
 
@@ -84,26 +84,26 @@
          <h3>Seiteneinstellungen (DIN-A4-Bogen)</h3>
         <div class="form-row">
             <label>Abstand horizontal (mm)
-                <input type="number" step="0.5" name="gap_x" id="tpl_gap_x" value="{{ defaults.gap_x }}" min="0" required>
+                <input type="number" step="0.1" name="gap_x" id="tpl_gap_x" value="{{ defaults.gap_x }}" min="0" required>
             </label>
             <label>Abstand vertikal (mm)
-                <input type="number" step="0.5" name="gap_y" id="tpl_gap_y" value="{{ defaults.gap_y }}" min="0" required>
+                <input type="number" step="0.1" name="gap_y" id="tpl_gap_y" value="{{ defaults.gap_y }}" min="0" required>
             </label>
         </div>
         <div class="form-row">
             <label>Seitenrand oben (mm)
-                <input type="number" step="0.5" name="margin_top" id="tpl_margin_top" value="{{ defaults.margin_top }}" min="0" required>
+                <input type="number" step="0.1" name="margin_top" id="tpl_margin_top" value="{{ defaults.margin_top }}" min="0" required>
             </label>
             <label>Seitenrand unten (mm)
-                <input type="number" step="0.5" name="margin_bottom" id="tpl_margin_bottom" value="{{ defaults.margin_bottom }}" min="0" required>
+                <input type="number" step="0.1" name="margin_bottom" id="tpl_margin_bottom" value="{{ defaults.margin_bottom }}" min="0" required>
             </label>
         </div>
         <div class="form-row">
             <label>Seitenrand links (mm)
-                <input type="number" step="0.5" name="margin_left" id="tpl_margin_left" value="{{ defaults.margin_left }}" min="0" required>
+                <input type="number" step="0.1" name="margin_left" id="tpl_margin_left" value="{{ defaults.margin_left }}" min="0" required>
             </label>
             <label>Seitenrand rechts (mm)
-                <input type="number" step="0.5" name="margin_right" id="tpl_margin_right" value="{{ defaults.margin_right }}" min="0" required>
+                <input type="number" step="0.1" name="margin_right" id="tpl_margin_right" value="{{ defaults.margin_right }}" min="0" required>
             </label>
         </div>
 
@@ -429,13 +429,13 @@ function showDesigner() {
                     <input type="text" name="static_text[]" class="static-text-content" value="${content || ""}">
                 </label>
                 <label>X (mm)
-                    <input type="number" step="0.5" name="static_text_x[]" class="static-text-x" value="${x ?? 2}">
+                    <input type="number" step="0.1" name="static_text_x[]" class="static-text-x" value="${x ?? 2}">
                 </label>
                 <label>Y (mm)
-                    <input type="number" step="0.5" name="static_text_y[]" class="static-text-y" value="${y ?? 2}">
+                    <input type="number" step="0.1" name="static_text_y[]" class="static-text-y" value="${y ?? 2}">
                 </label>
                 <label>Schriftgröße (pt)
-                    <input type="number" step="0.5" name="static_text_size[]" class="static-text-size" value="${size ?? 6}">
+                    <input type="number" step="0.1" name="static_text_size[]" class="static-text-size" value="${size ?? 6}">
                 </label>
             </div>
             <button type="button" class="btn btn-danger btn-small remove-static-text-btn">Zeile entfernen</button>
