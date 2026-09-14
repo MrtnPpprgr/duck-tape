@@ -1077,10 +1077,12 @@ def labels_generate():
         # Serial number text
         if elements["show_serial"]:
             serial_pdf_x, serial_pdf_y = label_topleft_to_pdf(
-                label_x, label_y, label_height, elements["serial_x"], elements["serial_y"]
-            )
-            c.setFont("Helvetica", elements["serial_font_size"])
-            c.drawString(serial_pdf_x, serial_pdf_y, serial)
+            label_x, label_y, label_height,
+            elements["serial_x"], elements["serial_y"]
+        )
+        c.setFont("Helvetica", elements["serial_font_size"])
+        serial_pdf_y -= elements["serial_font_size"] * 0.8
+        c.drawString(serial_pdf_x, serial_pdf_y, serial)
 
         # Static text fields (same content on every label)
         for field in elements["static_texts"]:
