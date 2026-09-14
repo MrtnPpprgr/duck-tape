@@ -162,6 +162,33 @@ aber nichts anlegen, ändern oder löschen (reine Ansichtsrechte).
   "reserviert", bis die jeweilige Platine später mit genau dieser Nummer
   angelegt wird.
 
+  **Etikett-Vorlagen (nur Admin gestaltet, alle Berechtigten drucken):**
+  Ganz oben auf der Etiketten-Seite kann ein **Admin** unter "Etikett-Design"
+  das komplette Aussehen eines Etiketts gestalten — Größe, ob QR-Code und/
+  oder Seriennummer erscheinen und wo genau (per Drag & Drop im
+  Vorschaukästchen oder als mm-Koordinaten), beliebig viele zusätzliche
+  Textzeilen (z. B. Firmenname, Warnhinweis), die auf jedem gedruckten
+  Etikett identisch bleiben, **sowie die Seiteneinstellungen** (Abstand
+  zwischen den Etiketten, Seitenränder des DIN-A4-Bogens). Das Ergebnis
+  wird unter einem frei wählbaren Namen als **Vorlage** gespeichert;
+  bestehende Vorlagen lassen sich über "Vorlage laden / bearbeiten" wieder
+  öffnen, ändern (erneutes Speichern unter demselben Namen aktualisiert
+  sie) oder löschen. Dieser Design-Bereich ist ausschließlich für
+  Admin-Konten sichtbar.
+
+  Alle anderen Nutzer mit "Platinen anlegen"-Recht sehen nur den
+  darunterliegenden **Druck-Bereich**: dort wird eine der gespeicherten
+  Vorlagen aus einem Dropdown ausgewählt (inkl. Vorschau) — Größe,
+  Abstände und Seitenränder werden dabei automatisch aus der Vorlage
+  übernommen und müssen nicht erneut eingegeben werden. Zusätzlich werden
+  nur noch die je Druckauftrag unterschiedlichen Angaben gemacht:
+  Start-Seriennummer, Anzahl und Startposition auf dem Bogen. Ohne
+  mindestens eine gespeicherte Vorlage kann nicht gedruckt werden — es
+  erscheint dann ein Hinweis, einen Admin um das Anlegen einer Vorlage zu
+  bitten.
+
+
+
 ## 7. Daten & Backup
 
 Alle Daten liegen in zwei Orten in diesem Ordner:
@@ -172,7 +199,51 @@ Für ein Backup reicht es, den gesamten `duck-tape`-Ordner (oder zumindest
 diese zwei Elemente) regelmäßig zu kopieren, z. B. auf ein Netzlaufwerk
 oder in die Cloud.
 
-## 8. App künftig wieder starten
+## 8. HTTPS aktivieren (für Kamera-QR-Scanner von anderen Geräten)
+
+Browser erlauben Kamerazugriff (für den QR-Code-Scanner im Suchfeld) aus
+Sicherheitsgründen nur über **HTTPS** oder **`http://localhost`** — nicht
+über eine normale `http://`-Netzwerk-IP. Auf dem PC selbst funktioniert der
+Scanner also auch ohne diesen Schritt (über `localhost`); für andere Geräte
+im Netzwerk (z. B. Handys) ist HTTPS nötig.
+
+**Einmalige Einrichtung:**
+
+```
+python generate_cert.py
+```
+
+Das erzeugt automatisch `cert.pem` und `key.pem` in diesem Ordner, gültig
+für `localhost` sowie die aktuell erkannte(n) lokale(n) Netzwerk-IP(s)
+dieses PCs. Startest du die App danach ganz normal mit `python app.py`,
+läuft sie automatisch über **HTTPS** (das erkennt die App selbst daran, ob
+`cert.pem`/`key.pem` vorhanden sind — ohne diese Dateien läuft alles wie
+gehabt über HTTP).
+
+**Aufruf danach:**
+```
+https://localhost:5000              (auf diesem PC)
+https://<IP-DIESES-PCS>:5000        (von anderen Geräten im Netzwerk)
+```
+
+**Browser-Warnung bestätigen:** Da es sich um ein **selbstsigniertes**
+Zertifikat handelt (nicht von einer offiziellen Stelle ausgestellt), zeigt
+jeder Browser beim ersten Aufruf eine Warnung wie "Nicht sicher" oder
+"Verbindung ist nicht privat". Das ist normal — auf **"Erweitert"** bzw.
+**"Details"** und dann **"Trotzdem fortfahren" / "Weiter zu ... (unsicher)"**
+klicken. Das muss auf **jedem Gerät einmalig** gemacht werden, das
+zugreift; danach funktioniert alles inklusive Kamera ohne weitere Hinweise.
+
+**Wichtig — IP-Adresse ändert sich:** Bekommt der Server-PC durch einen
+Neustart oder Router-Neuvergabe eine neue lokale IP-Adresse, passt das
+Zertifikat nicht mehr zur neuen Adresse (Browser zeigen dann eine andere
+Fehlermeldung, z. B. zur falschen Adresse). In dem Fall einfach erneut
+`python generate_cert.py` ausführen — es erkennt die neue IP automatisch
+und erstellt ein passendes Zertifikat. Für dauerhaft stabile Verhältnisse
+empfiehlt es sich, dem Server-PC im Router eine **feste lokale IP-Adresse**
+zuzuweisen.
+
+## 9. App künftig wieder starten
 
 Nach der Ersteinrichtung reicht künftig:
 
@@ -181,48 +252,3 @@ cd duck-tape
 venv\Scripts\activate        (Windows)   bzw.   source venv/bin/activate   (Mac/Linux)
 python app.py
 ```
-
-
-## Add fields to Database
-
-Wenn du ein neues Feld bei den Reparaturen ergänzen willst (z.B. "Priorität" oder "Dauer"), musst du an 6 Stellen etwas anpassen:
-
-1. Datenbank-Schema – app.py, in init_db(), Tabelle repairs (~Zeile 104):
-
-python
-technician  TEXT,
-parts       TEXT,
-mein_feld   TEXT,   # <- neue Spalte hinzufügen
-
-⚠️ Wichtig: Bei einer bestehenden reparaturen.db legt SQLite die neue Spalte nicht automatisch an. Du musst entweder die Datei löschen (Daten weg) oder einmalig ALTER TABLE repairs ADD COLUMN mein_feld TEXT; ausführen.
-
-2. Neue Reparatur speichern – app.py, Route create_repair (~Zeile 526):
-
-python
-mein_feld = request.form.get("mein_feld", "").strip()
-
-und in den INSERT INTO repairs (...) sowie im Werte-Tupel ergänzen.
-
-3. Reparatur bearbeiten – app.py, Route edit_repair (~Zeile 566):
-Gleiches nochmal: request.form.get(...), plus im UPDATE repairs SET ... und im Werte-Tupel.
-
-4. Formular „Neue Reparatur" – templates/board.html:
-
-html
-<label>Mein Feld
-    <input type="text" name="mein_feld">
-</label>
-
-5. Formular „Reparatur bearbeiten" – templates/edit_repair.html:
-
-html
-<label>Mein Feld
-    <input type="text" name="mein_feld" value="{{ repair['mein_feld'] or '' }}">
-</label>
-
-6. Anzeige in der Historie – templates/board.html, im Timeline-Block:
-
-html
-{% if repair['mein_feld'] %}
-    <p><strong>Mein Feld:</strong> {{ repair['mein_feld'] }}</p>
-{% endif %}

@@ -42,7 +42,15 @@
         <h2>Platine suchen</h2>
         <form action="{{ url_for('index') }}" method="get" class="form">
             <label>Seriennummer, Typ oder Version
-                <input type="text" name="q" value="{{ search }}" placeholder="Suchbegriff...">
+                <div class="search-input-wrap">
+                    <input type="text" name="q" id="search-input" value="{{ search }}" placeholder="Suchbegriff...">
+                    <button type="button" id="open-scanner-btn" class="camera-btn" title="QR-Code scannen">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg>
+                    </button>
+                </div>
             </label>
             <button type="submit" class="btn btn-secondary">Suchen</button>
             {% if search %}
@@ -51,6 +59,80 @@
         </form>
     </section>
 </div>
+
+<div id="scanner-overlay" class="scanner-overlay" style="display:none;">
+    <div class="scanner-box">
+        <video id="scanner-video" playsinline></video>
+        <canvas id="scanner-canvas" style="display:none;"></canvas>
+        <p id="scanner-status" class="scanner-status">Kamera wird gestartet...</p>
+        <button type="button" id="close-scanner-btn" class="btn btn-secondary">Abbrechen</button>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/jsQR.js') }}"></script>
+<script>
+(function () {
+    const openBtn = document.getElementById("open-scanner-btn");
+    const closeBtn = document.getElementById("close-scanner-btn");
+    const overlay = document.getElementById("scanner-overlay");
+    const video = document.getElementById("scanner-video");
+    const canvas = document.getElementById("scanner-canvas");
+    const status = document.getElementById("scanner-status");
+    const searchInput = document.getElementById("search-input");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+    let stream = null;
+    let scanning = false;
+
+    function stopScanner() {
+        scanning = false;
+        overlay.style.display = "none";
+        if (stream) {
+            stream.getTracks().forEach((track) => track.stop());
+            stream = null;
+        }
+    }
+
+    function scanFrame() {
+        if (!scanning) return;
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
+            if (code && code.data) {
+                searchInput.value = code.data;
+                stopScanner();
+                searchInput.form.submit();
+                return;
+            }
+        }
+        requestAnimationFrame(scanFrame);
+    }
+
+    openBtn.addEventListener("click", function () {
+        overlay.style.display = "flex";
+        status.textContent = "Kamera wird gestartet...";
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+            .then(function (s) {
+                stream = s;
+                video.srcObject = stream;
+                video.play();
+                status.textContent = "QR-Code vor die Kamera halten...";
+                scanning = true;
+                requestAnimationFrame(scanFrame);
+            })
+            .catch(function () {
+                status.textContent = "Kein Zugriff auf die Kamera möglich. "
+                    + "Hinweis: Kamerazugriff funktioniert aus Sicherheitsgründen meist nur über "
+                    + "http://localhost:5000 auf diesem PC, nicht über die Netzwerk-IP von anderen Geräten.";
+            });
+    });
+
+    closeBtn.addEventListener("click", stopScanner);
+})();
+</script>
 
 <section class="card">
     <h2>Alle Platinen ({{ boards|length }})</h2>

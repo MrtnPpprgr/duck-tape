@@ -1112,10 +1112,24 @@ def labels_generate():
 
 if __name__ == "__main__":
     init_db()
+
+    cert_path = os.path.join(BASE_DIR, "cert.pem")
+    key_path = os.path.join(BASE_DIR, "key.pem")
+    use_https = os.path.exists(cert_path) and os.path.exists(key_path)
+
+    protocol = "https" if use_https else "http"
     print("\n" + "=" * 60)
     print(" Duck-Tape Reparaturdatenbank läuft!")
-    print(" Auf diesem PC öffnen:      http://localhost:5000")
-    print(" Von anderen Geräten aus:   http://<IP-DIESES-PCS>:5000")
+    print(f" Auf diesem PC öffnen:      {protocol}://localhost:5000")
+    print(f" Von anderen Geräten aus:   {protocol}://<IP-DIESES-PCS>:5000")
     print(" (IP-Adresse herausfinden: siehe README.md)")
+    if not use_https:
+        print(" Hinweis: Kein cert.pem/key.pem gefunden -> läuft über HTTP.")
+        print(" Für Kamerazugriff (QR-Scanner) von anderen Geräten aus:")
+        print(" einmalig 'python generate_cert.py' ausführen, siehe README.md.")
     print("=" * 60 + "\n")
-    app.run(host="0.0.0.0", port=5000, debug=False)
+
+    if use_https:
+        app.run(host="0.0.0.0", port=5000, debug=False, ssl_context=(cert_path, key_path))
+    else:
+        app.run(host="0.0.0.0", port=5000, debug=False)
