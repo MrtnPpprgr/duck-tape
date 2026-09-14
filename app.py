@@ -1091,8 +1091,8 @@ def labels_generate():
             c.drawString(field_pdf_x, field_pdf_y, field["content"])
 
         # Outline for cutting/alignment help
-        c.setLineWidth(0.2)
-        c.rect(label_x, label_y, label_width * mm, label_height * mm)
+        # c.setLineWidth(0.2)
+        # c.rect(label_x, label_y, label_width * mm, label_height * mm)
 
         position += 1
 
