@@ -4,28 +4,156 @@
 {% block content %}
 <a href="{{ url_for('index') }}" class="link">← Zurück zur Übersicht</a>
 
-<section class="card">
-    <h2>Etiketten drucken (DIN A4)</h2>
+{% if current_user['is_admin'] %}
+<section class="card" id="template-editor-card">
+    <button onclick="showDesigner()" class="InvisButton"><h2>&#9654 Etikett-Designer</h2></button>
+    
     <p class="muted">
-        Erzeugt eine PDF-Seite mit Etiketten zum Ausdrucken auf DIN-A4-Etikettenbögen.
-        Die Seriennummern werden ab der angegebenen Start-Nummer hochgezählt; bereits vergebene
-        Nummern werden automatisch übersprungen.
+        Hier gestaltest du, wie ein einzelnes Etikett aussieht, und speicherst das Ergebnis
+        als Vorlage. Jede gespeicherte Vorlage kann danach beim Etiketten-Druck weiter unten
+        ausgewählt werden.
     </p>
 
-    <form action="{{ url_for('labels_generate') }}" method="post" class="form" id="labels-form">
+    <form action="{{ url_for('labels_template_save') }}" method="post" class="form" style ="display: none;" id="template-form">
+        <div class="form-row">
+            <label>Vorlage laden / bearbeiten
+                <select id="load-template-select">
+                    <option value="">-- neue Vorlage --</option>
+                    {% for t in templates %}
+                    <option value="{{ t['id'] }}">{{ t['name'] }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>Vorlagenname
+                <input type="text" name="template_name" id="template_name" placeholder="z.B. Standard 40×20" required>
+            </label>
+        </div>
+
+        <h3>Etikettengröße</h3>
+        <div class="form-row">
+            <label>Breite (mm)
+                <input type="number" step="0.5" name="label_width" id="tpl_label_width" value="{{ defaults.label_width }}" min="5" required>
+            </label>
+            <label>Höhe (mm)
+                <input type="number" step="0.5" name="label_height" id="tpl_label_height" value="{{ defaults.label_height }}" min="5" required>
+            </label>
+        </div>
+
+       
+
+        <h3>Etikett-Inhalt</h3>
+        <p class="muted small">
+            Elemente im Kästchen mit der Maus an die gewünschte Position ziehen, oder
+            Koordinaten rechts direkt eintragen (in mm, gemessen von der linken oberen Ecke
+            des Etiketts). Textzeilen bleiben auf jedem gedruckten Etikett identisch.
+        </p>
+
+        <div class="editor-layout">
+            <div class="editor-canvas-wrap">
+                <div class="label-editor-canvas" id="tpl-label-editor-canvas"></div>
+                <p class="muted small">Vorschau (nicht maßstabsgetreu)</p>
+            </div>
+
+            <div class="editor-controls">
+                <div class="editor-element">
+                    <label class="checkbox">
+                        <input type="checkbox" name="show_qr" id="tpl_show_qr" checked> QR-Code anzeigen
+                    </label>
+                    <div class="form-row small-row">
+                        <label>X (mm)<input type="number" step="0.5" name="qr_x" id="tpl_qr_x" value="1"></label>
+                        <label>Y (mm)<input type="number" step="0.5" name="qr_y" id="tpl_qr_y" value="1"></label>
+                        <label>Größe (mm)<input type="number" step="0.5" name="qr_size" id="tpl_qr_size" value="16"></label>
+                    </div>
+                </div>
+
+                <div class="editor-element">
+                    <label class="checkbox">
+                        <input type="checkbox" name="show_serial" id="tpl_show_serial" checked> Seriennummer anzeigen
+                    </label>
+                    <div class="form-row small-row">
+                        <label>X (mm)<input type="number" step="0.5" name="serial_x" id="tpl_serial_x" value="20"></label>
+                        <label>Y (mm)<input type="number" step="0.5" name="serial_y" id="tpl_serial_y" value="12"></label>
+                        <label>Schriftgröße (pt)<input type="number" step="0.5" name="serial_font_size" id="tpl_serial_font_size" value="7"></label>
+                    </div>
+                </div>
+
+                <div id="tpl-static-text-rows"></div>
+                <button type="button" class="btn btn-secondary" id="tpl-add-static-text">+ Textzeile hinzufügen</button>
+            </div>
+        </div>
+         <h3>Seiteneinstellungen (DIN-A4-Bogen)</h3>
+        <div class="form-row">
+            <label>Abstand horizontal (mm)
+                <input type="number" step="0.5" name="gap_x" id="tpl_gap_x" value="{{ defaults.gap_x }}" min="0" required>
+            </label>
+            <label>Abstand vertikal (mm)
+                <input type="number" step="0.5" name="gap_y" id="tpl_gap_y" value="{{ defaults.gap_y }}" min="0" required>
+            </label>
+        </div>
+        <div class="form-row">
+            <label>Seitenrand oben (mm)
+                <input type="number" step="0.5" name="margin_top" id="tpl_margin_top" value="{{ defaults.margin_top }}" min="0" required>
+            </label>
+            <label>Seitenrand unten (mm)
+                <input type="number" step="0.5" name="margin_bottom" id="tpl_margin_bottom" value="{{ defaults.margin_bottom }}" min="0" required>
+            </label>
+        </div>
+        <div class="form-row">
+            <label>Seitenrand links (mm)
+                <input type="number" step="0.5" name="margin_left" id="tpl_margin_left" value="{{ defaults.margin_left }}" min="0" required>
+            </label>
+            <label>Seitenrand rechts (mm)
+                <input type="number" step="0.5" name="margin_right" id="tpl_margin_right" value="{{ defaults.margin_right }}" min="0" required>
+            </label>
+        </div>
+
+        <div class="form-row">
+            <button type="submit" class="btn">Als Vorlage speichern</button>
+            <button type="button" class="btn btn-danger" id="delete-template-btn" style="display:none;">Ausgewählte Vorlage löschen</button>
+        </div>
+    </form>
+</section>
+
+<form id="delete-template-form" method="post" style="display:none;"></form>
+{% endif %}
+
+<section class="card">
+    <h2>Etiketten drucken (DIN A4)</h2>
+
+    {% if not templates %}
+        <p class="muted">
+            Es wurde noch keine Etikett-Vorlage angelegt.
+            {% if current_user['is_admin'] %}
+                Lege oben unter "Etikett-Design" eine Vorlage an, um Etiketten drucken zu können.
+            {% else %}
+                Bitte einen Admin bitten, zuerst eine Vorlage zu erstellen.
+            {% endif %}
+        </p>
+    {% else %}
+    <form action="{{ url_for('labels_generate') }}" method="post" class="form" id="print-form">
+        <div style="display: flex; gap: 10%;">
+            <label>Vorlage
+                <select name="template_id" id="print_template_id" required>
+                    {% for t in templates %}
+                    <option value="{{ t['id'] }}">{{ t['name'] }} ({{ t['label_width']|round(1) }}×{{ t['label_height']|round(1) }} mm)</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <div class="editor-canvas-wrap">
+                <div class="label-editor-canvas" id="print-preview-canvas"></div>
+            </div>
+        </div>
 
         <h3>Seriennummern</h3>
         <div class="form-row">
             <label>Start-Seriennummer
-                <input type="text" name="start_serial" id="start_serial"
-                       value="{{ suggested_serial }}" required>
+                <input type="text" name="start_serial" id="start_serial" value="{{ suggested_serial }}" required>
             </label>
             <label>Anzahl Etiketten
                 <input type="number" name="count" id="count" value="{{ defaults.count }}" min="1" max="500" required>
             </label>
             <label>Startposition auf dem Bogen
-                <input type="number" name="start_position" id="start_position"
-                       value="{{ defaults.start_position }}" min="1" required>
+                <input type="number" name="start_position" id="start_position" value="{{ defaults.start_position }}" min="1" required>
             </label>
         </div>
         <p class="muted small">
@@ -33,137 +161,130 @@
             begonnen werden soll — praktisch, wenn ein Etikettenbogen schon teilweise benutzt ist.
         </p>
 
-        <h3>Etikettengröße</h3>
-        <div class="form-row">
-            <label>Breite (mm)
-                <input type="number" step="0.5" name="label_width" id="label_width" value="{{ defaults.label_width }}" min="5" required>
-            </label>
-            <label>Höhe (mm)
-                <input type="number" step="0.5" name="label_height" id="label_height" value="{{ defaults.label_height }}" min="5" required>
-            </label>
-        </div>
-
-        <h3>Abstand zwischen den Etiketten</h3>
-        <div class="form-row">
-            <label>Abstand horizontal (mm)
-                <input type="number" step="0.5" name="gap_x" id="gap_x" value="{{ defaults.gap_x }}" min="0" required>
-            </label>
-            <label>Abstand vertikal (mm)
-                <input type="number" step="0.5" name="gap_y" id="gap_y" value="{{ defaults.gap_y }}" min="0" required>
-            </label>
-        </div>
-
-        <h3>Seitenrand (Bogen-Rand)</h3>
-        <div class="form-row">
-            <label>Oben (mm)
-                <input type="number" step="0.5" name="margin_top" id="margin_top" value="{{ defaults.margin_top }}" min="0" required>
-            </label>
-            <label>Unten (mm)
-                <input type="number" step="0.5" name="margin_bottom" id="margin_bottom" value="{{ defaults.margin_bottom }}" min="0" required>
-            </label>
-        </div>
-        <div class="form-row">
-            <label>Links (mm)
-                <input type="number" step="0.5" name="margin_left" id="margin_left" value="{{ defaults.margin_left }}" min="0" required>
-            </label>
-            <label>Rechts (mm)
-                <input type="number" step="0.5" name="margin_right" id="margin_right" value="{{ defaults.margin_right }}" min="0" required>
-            </label>
-        </div>
+        <h3>Seiteneinstellungen</h3>
+        <p class="muted small" id="page-settings-info">
+            Werden aus der gewählten Vorlage übernommen.
+        </p>
+        <input type="hidden" name="gap_x" id="gap_x">
+        <input type="hidden" name="gap_y" id="gap_y">
+        <input type="hidden" name="margin_top" id="margin_top">
+        <input type="hidden" name="margin_bottom" id="margin_bottom">
+        <input type="hidden" name="margin_left" id="margin_left">
+        <input type="hidden" name="margin_right" id="margin_right">
 
         <div class="grid-preview-box">
             <p class="muted small" id="grid-info">Raster wird berechnet...</p>
+
             <div class="grid-preview" id="grid-preview"></div>
-        </div>
-
-        <h3>Etikett-Inhalt (Editor)</h3>
-        <p class="muted small">
-            Elemente im Kästchen mit der Maus an die gewünschte Position ziehen, oder Koordinaten
-            rechts direkt eintragen. Position wird von der linken oberen Ecke des Etiketts aus
-            gemessen (in mm). Textzeilen bleiben auf jedem gedruckten Etikett identisch.
-        </p>
-
-        <div class="editor-layout">
-            <div class="editor-canvas-wrap">
-                <div class="label-editor-canvas" id="label-editor-canvas"></div>
-                <p class="muted small">Vorschau (nicht maßstabsgetreu für den Druck, nur zur Orientierung)</p>
-            </div>
-
-            <div class="editor-controls">
-                <div class="editor-element">
-                    <label class="checkbox">
-                        <input type="checkbox" name="show_qr" id="show_qr" checked> QR-Code anzeigen
-                    </label>
-                    <div class="form-row small-row">
-                        <label>X (mm)
-                            <input type="number" step="0.5" name="qr_x" id="qr_x" value="1">
-                        </label>
-                        <label>Y (mm)
-                            <input type="number" step="0.5" name="qr_y" id="qr_y" value="1">
-                        </label>
-                        <label>Größe (mm)
-                            <input type="number" step="0.5" name="qr_size" id="qr_size" value="16">
-                        </label>
-                    </div>
-                </div>
-
-                <div class="editor-element">
-                    <label class="checkbox">
-                        <input type="checkbox" name="show_serial" id="show_serial" checked> Seriennummer anzeigen
-                    </label>
-                    <div class="form-row small-row">
-                        <label>X (mm)
-                            <input type="number" step="0.5" name="serial_x" id="serial_x" value="20">
-                        </label>
-                        <label>Y (mm)
-                            <input type="number" step="0.5" name="serial_y" id="serial_y" value="12">
-                        </label>
-                        <label>Schriftgröße (pt)
-                            <input type="number" step="0.5" name="serial_font_size" id="serial_font_size" value="7">
-                        </label>
-                    </div>
-                </div>
-
-                <div id="static-text-rows"></div>
-                <button type="button" class="btn btn-secondary" id="add-static-text">+ Textzeile hinzufügen</button>
-                <p class="muted small">
-                    Zusätzliche Textzeilen (z. B. Firmenname, Hinweis) — erscheinen unverändert
-                    auf jedem Etikett.
-                </p>
-            </div>
         </div>
 
         <button type="submit" class="btn">PDF erzeugen &amp; herunterladen</button>
     </form>
+    {% endif %}
 </section>
 
 <script>
+const templatesData = {{ templates_json|safe }};
+const suggestedSerial = {{ suggested_serial|tojson }};
+
+function computeScale(wMm, hMm, maxW, maxH) {
+    return Math.min(4, maxW / wMm, maxH / hMm);
+}
+
+/* Read-only preview: draws a design object (from a saved template) into a canvas. */
+function renderStaticPreview(canvasEl, design) {
+    if (!canvasEl || !design) return;
+    const scale = computeScale(design.label_width, design.label_height, 380, 260);
+    canvasEl.style.width = (design.label_width * scale) + "px";
+    canvasEl.style.height = (design.label_height * scale) + "px";
+    canvasEl.innerHTML = "";
+    canvasEl.style.cursor = "default";
+
+    function addBox(x, y, w, h, text, cls, fontSizePt) {
+        const box = document.createElement("div");
+        box.className = "editor-box " + cls;
+        box.style.left = (x * scale) + "px";
+        box.style.top = (y * scale) + "px";
+        if (w != null) box.style.width = (w * scale) + "px";
+        if (h != null) box.style.height = (h * scale) + "px";
+        if (fontSizePt != null) box.style.fontSize = (fontSizePt * 0.3528 * scale) + "px";
+        box.style.cursor = "default";
+        box.textContent = text;
+        canvasEl.appendChild(box);
+    }
+
+    if (design.show_qr) addBox(design.qr_x, design.qr_y, design.qr_size, design.qr_size, "QR", "editor-box-qr", null);
+    if (design.show_serial) addBox(design.serial_x, design.serial_y, null, null, suggestedSerial, "editor-box-text", design.serial_font_size);
+    (design.static_texts || []).forEach(function (t) {
+        addBox(t.x, t.y, null, null, t.content, "editor-box-text", t.font_size);
+    });
+}
+
+/* ---------- Druck-Sektion: Raster-Vorschau + Vorlagen-Vorschau ---------- */
+function showDesigner() {
+  var x = document.getElementById("template-form");
+  if (x.style.display === "none") {
+    x.style.display = "block";
+  } else {
+    x.style.display = "none";
+  }
+}
+
+
 (function () {
-    /* ---------- Bestehende Raster-Vorschau (Spalten × Zeilen pro Seite) ---------- */
-    const gridFields = ["label_width", "label_height", "gap_x", "gap_y",
-                         "margin_top", "margin_bottom", "margin_left", "margin_right"];
+    const printForm = document.getElementById("print-form");
+    if (!printForm) return;
+
+    const gridFields = ["gap_x", "gap_y", "margin_top", "margin_bottom", "margin_left", "margin_right"];
     const startPositionInput = document.getElementById("start_position");
+    const count = document.getElementById("count");
     const gridInfo = document.getElementById("grid-info");
     const gridPreview = document.getElementById("grid-preview");
+    const templateSelect = document.getElementById("print_template_id");
+    const previewCanvas = document.getElementById("print-preview-canvas");
 
     let currentColumns = {{ columns }};
     let currentRows = {{ rows }};
+
+    function selectedTemplate() {
+        const id = parseInt(templateSelect.value, 10);
+        return templatesData.find((t) => t.id === id);
+    }
 
     function renderGrid(columns, rows) {
         gridPreview.innerHTML = "";
         gridPreview.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
         const total = columns * rows;
-        const startPos = parseInt(startPositionInput.value || "1", 10);
+        const startPos =    parseInt(startPositionInput.value || "1", 10);
+        const endPos =      parseInt(count.value || "1", 10);
         for (let i = 1; i <= total; i++) {
             const cell = document.createElement("div");
-            cell.className = "grid-cell" + (i >= startPos ? " grid-cell-active" : "");
+            cell.className = "grid-cell" + (i >= startPos ? (i <= endPos + startPos - 1 ? " grid-cell-active" : "") : "");
             cell.textContent = i;
             gridPreview.appendChild(cell);
         }
     }
 
+    function applyTemplatePageSettings(template) {
+        if (!template) return;
+        document.getElementById("gap_x").value = template.gap_x;
+        document.getElementById("gap_y").value = template.gap_y;
+        document.getElementById("margin_top").value = template.margin_top;
+        document.getElementById("margin_bottom").value = template.margin_bottom;
+        document.getElementById("margin_left").value = template.margin_left;
+        document.getElementById("margin_right").value = template.margin_right;
+        document.getElementById("page-settings-info").textContent =
+            `Abstand ${template.gap_x}/${template.gap_y} mm (horizontal/vertikal) · `
+            + `Seitenrand oben/unten/links/rechts: ${template.margin_top}/${template.margin_bottom}/`
+            + `${template.margin_left}/${template.margin_right} mm (aus Vorlage "${template.name}")`;
+    }
+
     function updateGrid() {
+        const template = selectedTemplate();
+        if (!template) return;
         const params = new URLSearchParams();
+        params.set("label_width", template.label_width);
+        params.set("label_height", template.label_height);
         gridFields.forEach((id) => params.set(id, document.getElementById(id).value || 0));
 
         fetch("{{ url_for('labels_preview_grid') }}?" + params.toString())
@@ -181,19 +302,32 @@
             });
     }
 
+    function updateTemplatePreview() {
+        const template = selectedTemplate();
+        renderStaticPreview(previewCanvas, template);
+        applyTemplatePageSettings(template);
+        updateGrid();
+    }
+
     gridFields.forEach((id) => document.getElementById(id).addEventListener("input", updateGrid));
     startPositionInput.addEventListener("input", () => renderGrid(currentColumns, currentRows));
-    renderGrid(currentColumns, currentRows);
+    count.addEventListener("input", () => renderGrid(currentColumns, currentRows));
+    templateSelect.addEventListener("change", updateTemplatePreview);
 
-    /* ---------- Etikett-Inhalt-Editor (QR-Code / Seriennummer / Textzeilen) ---------- */
-    const canvas = document.getElementById("label-editor-canvas");
-    const suggestedSerial = {{ suggested_serial|tojson }};
-    let scale = 4; // px pro mm, wird an die Etikettengröße angepasst
+    updateTemplatePreview();
+})();
+
+/* ---------- Admin: Etikett-Design-Editor (Drag & Drop, Vorlagen speichern/laden/löschen) ---------- */
+(function () {
+    const canvas = document.getElementById("tpl-label-editor-canvas");
+    if (!canvas) return; // kein Admin -> Editor nicht vorhanden
+
+    let scale = 4;
 
     function labelSizeMm() {
         return {
-            w: parseFloat(document.getElementById("label_width").value) || 40,
-            h: parseFloat(document.getElementById("label_height").value) || 20,
+            w: parseFloat(document.getElementById("tpl_label_width").value)+1 || 40,
+            h: parseFloat(document.getElementById("tpl_label_height").value)+1 || 20,
         };
     }
 
@@ -229,18 +363,16 @@
 
     function renderEditorCanvas() {
         const { w, h } = labelSizeMm();
-        const maxCanvasWidth = 380;
-        const maxCanvasHeight = 260;
-        scale = Math.min(4, maxCanvasWidth / w, maxCanvasHeight / h);
+        scale = computeScale(w, h, 380, 260);
 
         canvas.style.width = mmToPx(w) + "px";
         canvas.style.height = mmToPx(h) + "px";
         canvas.innerHTML = "";
 
-        if (document.getElementById("show_qr").checked) {
-            const qrSize = parseFloat(document.getElementById("qr_size").value) || 16;
-            const qrX = parseFloat(document.getElementById("qr_x").value) || 0;
-            const qrY = parseFloat(document.getElementById("qr_y").value) || 0;
+        if (document.getElementById("tpl_show_qr").checked) {
+            const qrSize = parseFloat(document.getElementById("tpl_qr_size").value) || 16;
+            const qrX = parseFloat(document.getElementById("tpl_qr_x").value) || 0;
+            const qrY = parseFloat(document.getElementById("tpl_qr_y").value) || 0;
             const box = document.createElement("div");
             box.className = "editor-box editor-box-qr";
             box.style.left = mmToPx(qrX) + "px";
@@ -249,13 +381,13 @@
             box.style.height = mmToPx(qrSize) + "px";
             box.textContent = "QR";
             canvas.appendChild(box);
-            makeDraggable(box, document.getElementById("qr_x"), document.getElementById("qr_y"));
+            makeDraggable(box, document.getElementById("tpl_qr_x"), document.getElementById("tpl_qr_y"));
         }
 
-        if (document.getElementById("show_serial").checked) {
-            const fontSize = parseFloat(document.getElementById("serial_font_size").value) || 7;
-            const sx = parseFloat(document.getElementById("serial_x").value) || 0;
-            const sy = parseFloat(document.getElementById("serial_y").value) || 0;
+        if (document.getElementById("tpl_show_serial").checked) {
+            const fontSize = parseFloat(document.getElementById("tpl_serial_font_size").value) || 7;
+            const sx = parseFloat(document.getElementById("tpl_serial_x").value) || 0;
+            const sy = parseFloat(document.getElementById("tpl_serial_y").value) || 0;
             const box = document.createElement("div");
             box.className = "editor-box editor-box-text";
             box.style.left = mmToPx(sx) + "px";
@@ -263,10 +395,10 @@
             box.style.fontSize = (fontSize * 0.3528 * scale) + "px";
             box.textContent = suggestedSerial;
             canvas.appendChild(box);
-            makeDraggable(box, document.getElementById("serial_x"), document.getElementById("serial_y"));
+            makeDraggable(box, document.getElementById("tpl_serial_x"), document.getElementById("tpl_serial_y"));
         }
 
-        document.querySelectorAll(".static-text-row").forEach(function (row) {
+        document.querySelectorAll("#tpl-static-text-rows .static-text-row").forEach(function (row) {
             const contentInput = row.querySelector(".static-text-content");
             const xInput = row.querySelector(".static-text-x");
             const yInput = row.querySelector(".static-text-y");
@@ -288,7 +420,7 @@
     }
 
     function addStaticTextRow(content, x, y, size) {
-        const container = document.getElementById("static-text-rows");
+        const container = document.getElementById("tpl-static-text-rows");
         const row = document.createElement("div");
         row.className = "editor-element static-text-row";
         row.innerHTML = `
@@ -318,12 +450,84 @@
         renderEditorCanvas();
     }
 
-    document.getElementById("add-static-text").addEventListener("click", function () {
+    function clearStaticTextRows() {
+        document.getElementById("tpl-static-text-rows").innerHTML = "";
+    }
+
+    function resetEditorToDefaults() {
+        document.getElementById("template_name").value = "";
+        document.getElementById("tpl_label_width").value = {{ defaults.label_width }};
+        document.getElementById("tpl_label_height").value = {{ defaults.label_height }};
+        document.getElementById("tpl_gap_x").value = {{ defaults.gap_x }};
+        document.getElementById("tpl_gap_y").value = {{ defaults.gap_y }};
+        document.getElementById("tpl_margin_top").value = {{ defaults.margin_top }};
+        document.getElementById("tpl_margin_bottom").value = {{ defaults.margin_bottom }};
+        document.getElementById("tpl_margin_left").value = {{ defaults.margin_left }};
+        document.getElementById("tpl_margin_right").value = {{ defaults.margin_right }};
+        document.getElementById("tpl_show_qr").checked = true;
+        document.getElementById("tpl_qr_x").value = 1;
+        document.getElementById("tpl_qr_y").value = 1;
+        document.getElementById("tpl_qr_size").value = 16;
+        document.getElementById("tpl_show_serial").checked = true;
+        document.getElementById("tpl_serial_x").value = 20;
+        document.getElementById("tpl_serial_y").value = 12;
+        document.getElementById("tpl_serial_font_size").value = 7;
+        clearStaticTextRows();
+        document.getElementById("delete-template-btn").style.display = "none";
+        renderEditorCanvas();
+    }
+
+    function loadTemplateIntoEditor(template) {
+        document.getElementById("template_name").value = template.name;
+        document.getElementById("tpl_label_width").value = template.label_width;
+        document.getElementById("tpl_label_height").value = template.label_height;
+        document.getElementById("tpl_gap_x").value = template.gap_x;
+        document.getElementById("tpl_gap_y").value = template.gap_y;
+        document.getElementById("tpl_margin_top").value = template.margin_top;
+        document.getElementById("tpl_margin_bottom").value = template.margin_bottom;
+        document.getElementById("tpl_margin_left").value = template.margin_left;
+        document.getElementById("tpl_margin_right").value = template.margin_right;
+        document.getElementById("tpl_show_qr").checked = template.show_qr;
+        document.getElementById("tpl_qr_x").value = template.qr_x;
+        document.getElementById("tpl_qr_y").value = template.qr_y;
+        document.getElementById("tpl_qr_size").value = template.qr_size;
+        document.getElementById("tpl_show_serial").checked = template.show_serial;
+        document.getElementById("tpl_serial_x").value = template.serial_x;
+        document.getElementById("tpl_serial_y").value = template.serial_y;
+        document.getElementById("tpl_serial_font_size").value = template.serial_font_size;
+        clearStaticTextRows();
+        (template.static_texts || []).forEach((t) => addStaticTextRow(t.content, t.x, t.y, t.font_size));
+        document.getElementById("delete-template-btn").style.display = "inline-block";
+        renderEditorCanvas();
+    }
+
+    document.getElementById("tpl-add-static-text").addEventListener("click", function () {
         addStaticTextRow("", 2, 2, 6);
     });
 
-    ["label_width", "label_height", "show_qr", "show_serial",
-     "qr_x", "qr_y", "qr_size", "serial_x", "serial_y", "serial_font_size"]
+    document.getElementById("load-template-select").addEventListener("change", function () {
+        const id = parseInt(this.value, 10);
+        const template = templatesData.find((t) => t.id === id);
+        if (template) {
+            loadTemplateIntoEditor(template);
+        } else {
+            resetEditorToDefaults();
+        }
+    });
+
+    document.getElementById("delete-template-btn").addEventListener("click", function () {
+        const select = document.getElementById("load-template-select");
+        const id = parseInt(select.value, 10);
+        const template = templatesData.find((t) => t.id === id);
+        if (!template) return;
+        if (!confirm(`Vorlage '${template.name}' wirklich löschen?`)) return;
+        const form = document.getElementById("delete-template-form");
+        form.action = "/labels/templates/" + id + "/delete";
+        form.submit();
+    });
+
+    ["tpl_label_width", "tpl_label_height", "tpl_show_qr", "tpl_show_serial",
+     "tpl_qr_x", "tpl_qr_y", "tpl_qr_size", "tpl_serial_x", "tpl_serial_y", "tpl_serial_font_size"]
         .forEach((id) => document.getElementById(id).addEventListener("input", renderEditorCanvas));
 
     renderEditorCanvas();
