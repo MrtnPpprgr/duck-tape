@@ -200,7 +200,7 @@ def next_serial_number(db):
     
     rows = db.execute(
         "SELECT serial_number FROM boards WHERE serial_number LIKE ?",
-        (f"PL-{year_code}-%",),
+        (f"PL-{year_code}%",),
     ).fetchall()
     
     highest_number = 0
@@ -208,7 +208,7 @@ def next_serial_number(db):
         suffix = row["serial_number"].rsplit("-", 1)[-1]
         if suffix.isdigit():
             highest_number = max(highest_number, int(suffix))
-    return f"PL-{year_code}-{highest_number + 1:03d}"
+    return f"PL-{year_code}{highest_number + 1:03d}"
 
 
 def split_serial_pattern(serial):
