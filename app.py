@@ -24,7 +24,7 @@ from datetime import datetime
 from functools import wraps
 from io import BytesIO
 
-import qrcode
+
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
@@ -191,20 +191,24 @@ def init_db():
 
     db.close()
 
-
 def next_serial_number(db):
-    """Generate the next auto serial number, e.g. PL-2026-0007."""
+    """Generiert die nächste Seriennummer, z.B. PL-B6-001 für das Jahr 2026."""
     year = datetime.now().year
+    year_str = str(year)[-2:]
+    letter = chr(64 + int(year_str[0])) 
+    year_code = f"{letter}{year_str[1]}"
+    
     rows = db.execute(
         "SELECT serial_number FROM boards WHERE serial_number LIKE ?",
-        (f"PL-{year}-%",),
+        (f"PL-{year_code}-%",),
     ).fetchall()
+    
     highest_number = 0
     for row in rows:
         suffix = row["serial_number"].rsplit("-", 1)[-1]
         if suffix.isdigit():
             highest_number = max(highest_number, int(suffix))
-    return f"PL-{year}-{highest_number + 1:04d}"
+    return f"PL-{year_code}-{highest_number + 1:03d}"
 
 
 def split_serial_pattern(serial):
@@ -889,7 +893,9 @@ def labels_template_delete(template_id):
 @permission_required("can_create")
 def labels_page():
     db = get_db()
-    suggested_serial = next_serial_number(db)
+    suggested_serial = request.args.get("suggested_serial")
+    if suggested_serial is None:
+        suggested_serial = next_serial_number(db)
     templates = get_label_templates(db)
     templates_json = json.dumps([{
         "id": t["id"], "name": t["name"],

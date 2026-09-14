@@ -195,8 +195,8 @@ function computeScale(wMm, hMm, maxW, maxH) {
 function renderStaticPreview(canvasEl, design) {
     if (!canvasEl || !design) return;
     const scale = computeScale(design.label_width, design.label_height, 380, 260);
-    canvasEl.style.width = (design.label_width * scale) + "px";
-    canvasEl.style.height = (design.label_height * scale) + "px";
+    canvasEl.style.width = ((design.label_width + 1) * scale) + "px";
+    canvasEl.style.height = ((design.label_height + 1) * scale) + "px";
     canvasEl.innerHTML = "";
     canvasEl.style.cursor = "default";
 
