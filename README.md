@@ -143,6 +143,24 @@ aber nichts anlegen, ändern oder löschen (reine Ansichtsrechte).
 - Wird eine Platine mehrfach repariert, siehst du auf der Übersichtsseite
   sofort "2× repariert", "3× repariert" usw., und auf der Detailseite die
   komplette Chronik.
+- **QR-Code je Platine** – auf der Detailseite jeder Platine wird ein
+  QR-Code angezeigt, der auf Klick als PNG heruntergeladen werden kann
+  (enthält die Seriennummer).
+- **Etiketten drucken (DIN A4)** – über "Etiketten drucken" in der
+  Navigation lässt sich ein PDF-Bogen mit QR-Code-Etiketten erzeugen:
+  - Etikettengröße (Breite/Höhe)
+  - Abstand zwischen den Etiketten (horizontal/vertikal)
+  - Seitenränder (oben/unten/links/rechts)
+  - Anzahl der zu druckenden Etiketten
+  - Startposition auf dem Bogen (praktisch für teilweise benutzte
+    Etikettenbögen — Position 1 = oben links, dann zeilenweise weiter)
+
+  Die Seriennummern werden ab einer angegebenen Start-Nummer hochgezählt;
+  bereits vergebene Nummern werden automatisch übersprungen und durch die
+  nächsthöhere freie Nummer ersetzt. Die erzeugten Nummern werden dabei
+  **nicht automatisch** in der Datenbank angelegt — sie sind nur so lange
+  "reserviert", bis die jeweilige Platine später mit genau dieser Nummer
+  angelegt wird.
 
 ## 7. Daten & Backup
 

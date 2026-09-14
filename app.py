@@ -15,14 +15,23 @@ Please change the password right after the first login (see "Mein Konto")!
 """
 
 import os
+import re
+import json
 import sqlite3
 import qrcode
 from io import BytesIO
 from datetime import datetime
 from functools import wraps
+from io import BytesIO
+
+
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas as pdf_canvas
 
 from flask import (Flask, g, render_template, request, redirect,
-                    url_for, flash, send_from_directory, abort, session, send_file)
+                    url_for, flash, send_from_directory, send_file, abort, session)
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -121,8 +130,48 @@ def init_db():
             filename    TEXT NOT NULL,
             FOREIGN KEY (repair_id) REFERENCES repairs (id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS label_templates (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            name              TEXT COLLATE NOCASE UNIQUE NOT NULL,
+            label_width       REAL NOT NULL,
+            label_height      REAL NOT NULL,
+            show_qr           INTEGER NOT NULL DEFAULT 1,
+            qr_x              REAL NOT NULL DEFAULT 1,
+            qr_y              REAL NOT NULL DEFAULT 1,
+            qr_size           REAL NOT NULL DEFAULT 16,
+            show_serial       INTEGER NOT NULL DEFAULT 1,
+            serial_x          REAL NOT NULL DEFAULT 20,
+            serial_y          REAL NOT NULL DEFAULT 12,
+            serial_font_size  REAL NOT NULL DEFAULT 7,
+            static_texts_json TEXT NOT NULL DEFAULT '[]',
+            gap_x             REAL NOT NULL DEFAULT 2,
+            gap_y             REAL NOT NULL DEFAULT 2,
+            margin_top        REAL NOT NULL DEFAULT 10,
+            margin_bottom     REAL NOT NULL DEFAULT 10,
+            margin_left       REAL NOT NULL DEFAULT 10,
+            margin_right      REAL NOT NULL DEFAULT 10,
+            created_at        TEXT NOT NULL,
+            created_by        TEXT
+        );
         """
     )
+    db.commit()
+
+    # Lightweight migration: add new columns to an already-existing table
+    # without losing existing rows (for people upgrading from an older version).
+    existing_columns = {row["name"] for row in db.execute("PRAGMA table_info(label_templates)").fetchall()}
+    new_columns = {
+        "gap_x": "REAL NOT NULL DEFAULT 2",
+        "gap_y": "REAL NOT NULL DEFAULT 2",
+        "margin_top": "REAL NOT NULL DEFAULT 10",
+        "margin_bottom": "REAL NOT NULL DEFAULT 10",
+        "margin_left": "REAL NOT NULL DEFAULT 10",
+        "margin_right": "REAL NOT NULL DEFAULT 10",
+    }
+    for column, coldef in new_columns.items():
+        if column not in existing_columns:
+            db.execute(f"ALTER TABLE label_templates ADD COLUMN {column} {coldef}")
     db.commit()
 
     # Create a default admin account on the very first run
@@ -142,22 +191,58 @@ def init_db():
 
     db.close()
 
-
 def next_serial_number(db):
-    """Generate the next auto serial number, e.g. PL-2026-0007."""
+    """Generiert die nächste Seriennummer, z.B. PL-B6-001 für das Jahr 2026."""
     year = datetime.now().year
+    year_str = str(year)[-2:]
+    letter = chr(64 + int(year_str[0])) 
+    year_code = f"{letter}{year_str[1]}"
+    
     rows = db.execute(
         "SELECT serial_number FROM boards WHERE serial_number LIKE ?",
-        (f"PL-{year}-%",),
+        (f"PL-{year_code}%",),
     ).fetchall()
-
+    
     highest_number = 0
     for row in rows:
         suffix = row["serial_number"].rsplit("-", 1)[-1]
         if suffix.isdigit():
             highest_number = max(highest_number, int(suffix))
+    return f"PL-{year_code}{highest_number + 1:03d}"
 
-    return f"PL-{year}-{highest_number + 1:04d}"
+
+def split_serial_pattern(serial):
+    """Split a serial number into (prefix, numeric_part_as_string).
+    e.g. 'PL-2026-0010' -> ('PL-2026-', '0010'). Returns (serial, None) if no
+    trailing digits are found."""
+    match = re.match(r"^(.*?)(\d+)$", serial)
+    if not match:
+        return serial, None
+    return match.group(1), match.group(2)
+
+
+def generate_available_serials(db, start_serial, count):
+    """Starting from start_serial, count upward and return `count` serial
+    numbers that do not yet exist in the database (case-insensitive),
+    skipping over any that are already taken."""
+    prefix, digits = split_serial_pattern(start_serial)
+    if digits is None:
+        raise ValueError("Die Start-Seriennummer muss am Ende eine Zahl enthalten.")
+
+    width = len(digits)
+    number = int(digits)
+    result = []
+
+    while len(result) < count:
+        candidate = f"{prefix}{number:0{width}d}"
+        exists = db.execute(
+            "SELECT 1 FROM boards WHERE serial_number = ? COLLATE NOCASE", (candidate,)
+        ).fetchone()
+        if not exists:
+            result.append(candidate)
+        number += 1
+
+    return result
 
 
 def allowed_file(filename):
@@ -640,6 +725,12 @@ def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
 
+@app.route("/uploads/<path:filename>/download")
+@login_required
+def download_file(filename):
+    return send_from_directory(app.config["UPLOAD_FOLDER"], filename, as_attachment=True)
+
+
 @app.route("/boards/<int:board_id>/qrcode.png")
 @login_required
 def board_qrcode(board_id):
@@ -657,6 +748,362 @@ def board_qrcode(board_id):
     img.save(buffer, format="PNG")
     buffer.seek(0)
     return send_file(buffer, mimetype="image/png")
+
+
+# ---------------------------------------------------------------------------
+# Label sheet generator (QR code stickers as a DIN A4 PDF)
+# ---------------------------------------------------------------------------
+
+LABEL_DEFAULTS = {
+    "label_width": 40, "label_height": 20,
+    "gap_x": 2, "gap_y": 2,
+    "margin_top": 10, "margin_bottom": 10, "margin_left": 10, "margin_right": 10,
+    "count": 1, "start_position": 1,
+}
+
+
+def compute_label_grid(label_width, label_height, gap_x, gap_y,
+                        margin_top, margin_bottom, margin_left, margin_right):
+    """Work out how many label columns/rows fit on one A4 page for the
+    given sizes (all values in millimetres)."""
+    page_width_mm = A4[0] / mm
+    page_height_mm = A4[1] / mm
+
+    usable_width = page_width_mm - margin_left - margin_right
+    usable_height = page_height_mm - margin_top - margin_bottom
+
+    columns = max(1, int((usable_width + gap_x) // (label_width + gap_x)))
+    rows = max(1, int((usable_height + gap_y) // (label_height + gap_y)))
+    return columns, rows
+
+
+@app.route("/labels/preview-qr")
+@permission_required("can_create")
+def labels_preview_qr():
+    """Return a QR code PNG for arbitrary text, used for the live single-label
+    preview on the labels page (the serial number may not exist as a board yet)."""
+    text = request.args.get("text", "").strip() or "PL-0000-0000"
+    img = qrcode.make(text, box_size=6, border=1)
+    buffer = BytesIO()
+    img.save(buffer, format="PNG")
+    buffer.seek(0)
+    return send_file(buffer, mimetype="image/png")
+
+
+def get_label_templates(db):
+    return db.execute(
+        "SELECT * FROM label_templates ORDER BY name COLLATE NOCASE"
+    ).fetchall()
+
+
+def template_row_to_elements(template_row):
+    """Convert a label_templates DB row into the same 'elements' dict shape
+    that parse_label_elements() produces from the editor form."""
+    return {
+        "show_qr": bool(template_row["show_qr"]),
+        "qr_x": template_row["qr_x"], "qr_y": template_row["qr_y"], "qr_size": template_row["qr_size"],
+        "show_serial": bool(template_row["show_serial"]),
+        "serial_x": template_row["serial_x"], "serial_y": template_row["serial_y"],
+        "serial_font_size": template_row["serial_font_size"],
+        "static_texts": json.loads(template_row["static_texts_json"]),
+    }
+
+
+@app.route("/labels/templates/save", methods=["POST"])
+@permission_required("is_admin")
+def labels_template_save():
+    db = get_db()
+    name = request.form.get("template_name", "").strip()
+    if not name:
+        flash("Bitte einen Namen für die Vorlage angeben.", "fehler")
+        return redirect(url_for("labels_page"))
+
+    try:
+        label_width = float(request.form.get("label_width"))
+        label_height = float(request.form.get("label_height"))
+        gap_x = float(request.form.get("gap_x"))
+        gap_y = float(request.form.get("gap_y"))
+        margin_top = float(request.form.get("margin_top"))
+        margin_bottom = float(request.form.get("margin_bottom"))
+        margin_left = float(request.form.get("margin_left"))
+        margin_right = float(request.form.get("margin_right"))
+        elements = parse_label_elements(request.form, label_height)
+    except (TypeError, ValueError):
+        flash("Bitte alle Felder der Vorlage mit gültigen Zahlen ausfüllen.", "fehler")
+        return redirect(url_for("labels_page"))
+
+    static_texts_json = json.dumps(elements["static_texts"])
+    existing = db.execute(
+        "SELECT id FROM label_templates WHERE name = ? COLLATE NOCASE", (name,)
+    ).fetchone()
+
+    if existing:
+        db.execute(
+            """UPDATE label_templates SET
+                 label_width = ?, label_height = ?,
+                 show_qr = ?, qr_x = ?, qr_y = ?, qr_size = ?,
+                 show_serial = ?, serial_x = ?, serial_y = ?, serial_font_size = ?,
+                 static_texts_json = ?,
+                 gap_x = ?, gap_y = ?,
+                 margin_top = ?, margin_bottom = ?, margin_left = ?, margin_right = ?
+               WHERE id = ?""",
+            (label_width, label_height,
+             1 if elements["show_qr"] else 0, elements["qr_x"], elements["qr_y"], elements["qr_size"],
+             1 if elements["show_serial"] else 0, elements["serial_x"], elements["serial_y"],
+             elements["serial_font_size"], static_texts_json,
+             gap_x, gap_y, margin_top, margin_bottom, margin_left, margin_right,
+             existing["id"]),
+        )
+        flash(f"Vorlage '{name}' wurde aktualisiert.", "erfolg")
+    else:
+        db.execute(
+            """INSERT INTO label_templates
+               (name, label_width, label_height, show_qr, qr_x, qr_y, qr_size,
+                show_serial, serial_x, serial_y, serial_font_size, static_texts_json,
+                gap_x, gap_y, margin_top, margin_bottom, margin_left, margin_right,
+                created_at, created_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (name, label_width, label_height,
+             1 if elements["show_qr"] else 0, elements["qr_x"], elements["qr_y"], elements["qr_size"],
+             1 if elements["show_serial"] else 0, elements["serial_x"], elements["serial_y"],
+             elements["serial_font_size"], static_texts_json,
+             gap_x, gap_y, margin_top, margin_bottom, margin_left, margin_right,
+             datetime.now().isoformat(timespec="seconds"), g.user["username"]),
+        )
+        flash(f"Vorlage '{name}' wurde angelegt.", "erfolg")
+
+    db.commit()
+    return redirect(url_for("labels_page"))
+
+
+@app.route("/labels/templates/<int:template_id>/delete", methods=["POST"])
+@permission_required("is_admin")
+def labels_template_delete(template_id):
+    db = get_db()
+    template_row = db.execute("SELECT * FROM label_templates WHERE id = ?", (template_id,)).fetchone()
+    if template_row is None:
+        abort(404)
+    db.execute("DELETE FROM label_templates WHERE id = ?", (template_id,))
+    db.commit()
+    flash(f"Vorlage '{template_row['name']}' wurde gelöscht.", "erfolg")
+    return redirect(url_for("labels_page"))
+
+
+@app.route("/labels")
+@permission_required("can_create")
+def labels_page():
+    db = get_db()
+    suggested_serial = request.args.get("suggested_serial")
+    if suggested_serial is None:
+        suggested_serial = next_serial_number(db)
+    templates = get_label_templates(db)
+    templates_json = json.dumps([{
+        "id": t["id"], "name": t["name"],
+        "label_width": t["label_width"], "label_height": t["label_height"],
+        "show_qr": bool(t["show_qr"]), "qr_x": t["qr_x"], "qr_y": t["qr_y"], "qr_size": t["qr_size"],
+        "show_serial": bool(t["show_serial"]), "serial_x": t["serial_x"], "serial_y": t["serial_y"],
+        "serial_font_size": t["serial_font_size"],
+        "static_texts": json.loads(t["static_texts_json"]),
+        "gap_x": t["gap_x"], "gap_y": t["gap_y"],
+        "margin_top": t["margin_top"], "margin_bottom": t["margin_bottom"],
+        "margin_left": t["margin_left"], "margin_right": t["margin_right"],
+    } for t in templates])
+
+    columns, rows = compute_label_grid(
+        LABEL_DEFAULTS["label_width"], LABEL_DEFAULTS["label_height"],
+        LABEL_DEFAULTS["gap_x"], LABEL_DEFAULTS["gap_y"],
+        LABEL_DEFAULTS["margin_top"], LABEL_DEFAULTS["margin_bottom"],
+        LABEL_DEFAULTS["margin_left"], LABEL_DEFAULTS["margin_right"],
+    )
+    return render_template(
+        "labels.html", defaults=LABEL_DEFAULTS, suggested_serial=suggested_serial,
+        columns=columns, rows=rows, templates=templates, templates_json=templates_json,
+    )
+
+
+@app.route("/labels/preview-grid")
+@permission_required("can_create")
+def labels_preview_grid():
+    """Small JSON helper so the form can live-update the columns/rows preview."""
+    try:
+        columns, rows = compute_label_grid(
+            float(request.args.get("label_width", 40)),
+            float(request.args.get("label_height", 20)),
+            float(request.args.get("gap_x", 2)),
+            float(request.args.get("gap_y", 2)),
+            float(request.args.get("margin_top", 10)),
+            float(request.args.get("margin_bottom", 10)),
+            float(request.args.get("margin_left", 10)),
+            float(request.args.get("margin_right", 10)),
+        )
+    except (TypeError, ValueError):
+        return {"columns": 0, "rows": 0, "per_page": 0}
+    return {"columns": columns, "rows": rows, "per_page": columns * rows}
+
+
+def label_topleft_to_pdf(label_x_pdf, label_y_pdf, label_height_mm, x_mm, y_mm):
+    """Convert a position given as (x_mm, y_mm) measured from the TOP-LEFT
+    corner of a label into absolute PDF coordinates (PDF's origin is
+    bottom-left of the page). label_x_pdf/label_y_pdf is the label's own
+    bottom-left corner in PDF points."""
+    pdf_x = label_x_pdf + x_mm * mm
+    pdf_y = label_y_pdf + (label_height_mm - y_mm) * mm
+    return pdf_x, pdf_y
+
+
+def parse_label_elements(form, label_height_mm):
+    """Read the QR code / serial number / static text field settings that
+    were configured in the visual label editor."""
+    elements = {"show_qr": form.get("show_qr") == "on", "show_serial": form.get("show_serial") == "on"}
+
+    elements["qr_x"] = float(form.get("qr_x", 1))
+    elements["qr_y"] = float(form.get("qr_y", 1))
+    elements["qr_size"] = float(form.get("qr_size", 16))
+
+    elements["serial_x"] = float(form.get("serial_x", 20))
+    elements["serial_y"] = float(form.get("serial_y", 12))
+    elements["serial_font_size"] = float(form.get("serial_font_size", 7))
+
+    texts = form.getlist("static_text[]")
+    xs = form.getlist("static_text_x[]")
+    ys = form.getlist("static_text_y[]")
+    sizes = form.getlist("static_text_size[]")
+
+    static_texts = []
+    for content, x, y, size in zip(texts, xs, ys, sizes):
+        content = content.strip()
+        if not content:
+            continue
+        static_texts.append({
+            "content": content,
+            "x": float(x), "y": float(y), "font_size": float(size),
+        })
+    elements["static_texts"] = static_texts
+    return elements
+
+
+@app.route("/labels/generate", methods=["POST"])
+@permission_required("can_create")
+def labels_generate():
+    db = get_db()
+
+    template_id = request.form.get("template_id")
+    template_row = db.execute(
+        "SELECT * FROM label_templates WHERE id = ?", (template_id,)
+    ).fetchone() if template_id else None
+
+    if template_row is None:
+        flash("Bitte eine Etikett-Vorlage auswählen.", "fehler")
+        return redirect(url_for("labels_page"))
+
+    label_width = template_row["label_width"]
+    label_height = template_row["label_height"]
+    elements = template_row_to_elements(template_row)
+
+    try:
+        gap_x = float(request.form.get("gap_x"))
+        gap_y = float(request.form.get("gap_y"))
+        margin_top = float(request.form.get("margin_top"))
+        margin_bottom = float(request.form.get("margin_bottom"))
+        margin_left = float(request.form.get("margin_left"))
+        margin_right = float(request.form.get("margin_right"))
+        count = int(request.form.get("count"))
+        start_position = int(request.form.get("start_position"))
+        start_serial = request.form.get("start_serial", "").strip()
+    except (TypeError, ValueError):
+        flash("Bitte alle Felder mit gültigen Zahlen ausfüllen.", "fehler")
+        return redirect(url_for("labels_page"))
+
+    if not start_serial:
+        flash("Bitte eine Start-Seriennummer angeben.", "fehler")
+        return redirect(url_for("labels_page"))
+    if count < 1 or count > 500:
+        flash("Anzahl muss zwischen 1 und 500 liegen.", "fehler")
+        return redirect(url_for("labels_page"))
+    if start_position < 1:
+        flash("Startposition muss mindestens 1 sein.", "fehler")
+        return redirect(url_for("labels_page"))
+
+    columns, rows = compute_label_grid(
+        label_width, label_height, gap_x, gap_y,
+        margin_top, margin_bottom, margin_left, margin_right,
+    )
+    labels_per_page = columns * rows
+    if start_position > labels_per_page:
+        flash(f"Startposition ({start_position}) liegt außerhalb des Rasters "
+              f"({labels_per_page} Etiketten pro Seite).", "fehler")
+        return redirect(url_for("labels_page"))
+
+    try:
+        serials = generate_available_serials(db, start_serial, count)
+    except ValueError as e:
+        flash(str(e), "fehler")
+        return redirect(url_for("labels_page"))
+
+    page_width, page_height = A4
+    buffer = BytesIO()
+    c = pdf_canvas.Canvas(buffer, pagesize=A4)
+
+    position = start_position
+    is_first_label = True
+
+    for serial in serials:
+        pos_on_page = (position - 1) % labels_per_page
+        if pos_on_page == 0 and not is_first_label:
+            c.showPage()
+        is_first_label = False
+
+        col = pos_on_page % columns
+        row = pos_on_page // columns
+
+        label_x = (margin_left + col * (label_width + gap_x)) * mm
+        label_y = page_height - (margin_top + (row + 1) * label_height + row * gap_y) * mm
+
+        # QR code
+        if elements["show_qr"]:
+            qr_img = qrcode.make(serial, box_size=6, border=1)
+            qr_buffer = BytesIO()
+            qr_img.save(qr_buffer, format="PNG")
+            qr_buffer.seek(0)
+
+            qr_size_pt = elements["qr_size"] * mm
+            qr_pdf_x, qr_top_pdf_y = label_topleft_to_pdf(
+                label_x, label_y, label_height, elements["qr_x"], elements["qr_y"]
+            )
+            qr_pdf_y = qr_top_pdf_y - qr_size_pt  # drawImage wants the bottom-left corner
+            c.drawImage(ImageReader(qr_buffer), qr_pdf_x, qr_pdf_y,
+                        width=qr_size_pt, height=qr_size_pt, mask="auto")
+
+        # Serial number text
+        if elements["show_serial"]:
+            serial_pdf_x, serial_pdf_y = label_topleft_to_pdf(
+            label_x, label_y, label_height,
+            elements["serial_x"], elements["serial_y"]
+        )
+        c.setFont("Helvetica", elements["serial_font_size"])
+        serial_pdf_y -= elements["serial_font_size"] * 0.8
+        c.drawString(serial_pdf_x, serial_pdf_y, serial)
+
+        # Static text fields (same content on every label)
+        for field in elements["static_texts"]:
+            field_pdf_x, field_pdf_y = label_topleft_to_pdf(
+                label_x, label_y, label_height, field["x"], field["y"]
+            )
+            c.setFont("Helvetica", field["font_size"])
+            c.drawString(field_pdf_x, field_pdf_y, field["content"])
+
+        # Outline for cutting/alignment help
+        # c.setLineWidth(0.2)
+        # c.rect(label_x, label_y, label_width * mm, label_height * mm)
+
+        position += 1
+
+    c.save()
+    buffer.seek(0)
+    return send_file(
+        buffer, mimetype="application/pdf", as_attachment=True,
+        download_name="etiketten.pdf",
+    )
 
 
 # ---------------------------------------------------------------------------
