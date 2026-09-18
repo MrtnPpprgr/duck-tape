@@ -26,7 +26,7 @@ Von anderen Geräten aus:   http://<IP-DIESES-PCS>:5000
 ## Hinweise
 Der Admin kann unter **"Benutzerverwaltung"** weitere Konten anlegen und pro
 Konto einzeln folgende Rechte vergeben:
-- **Reparaturn anlegen**
+- **Reparaturen anlegen**
 - **Reparaturen löschen**
 - **Reparatur-Historie bearbeiten** (neue Einträge hinzufügen und bestehende ändern)
 - **Admin** (zusätzlich: Benutzerverwaltung, hat automatisch alle Rechte)
@@ -85,7 +85,9 @@ html
 
 6. Anzeige in der Historie – templates/board.html, im Timeline-Block:
 
+```
 html
 {% if repair['mein_feld'] %}
     <p><strong>Mein Feld:</strong> {{ repair['mein_feld'] }}</p>
 {% endif %}
+```
