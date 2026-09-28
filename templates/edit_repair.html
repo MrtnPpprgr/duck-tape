@@ -12,10 +12,10 @@
                 <input type="date" name="date" value="{{ repair['date'] }}" required>
             </label>
             <label>Ticket ID
-                <input type="text" name="ticket" placeholder="Ticket ID">
+                <input type="text" name="ticket" value="{{ repair['ticket'] or '' }}" placeholder="Ticket ID">
             </label>           
             <label>Kunde
-                <input type="text" name="customer" placeholder="Albert Einstein">
+                <input type="text" name="customer" value="{{ repair['customer'] or '' }}" placeholder="Albert Einstein">
             </label>
         </div>
         <div class="form-row">
