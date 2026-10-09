@@ -15,21 +15,28 @@
         </p>
     </div>
     {% if current_user['is_admin'] or current_user['can_create'] %}
-    <div class="qr-box">       
+    <div class="qr-box">
         <a href="{{ url_for('labels_page', suggested_serial= board['serial_number']) }}">
             <img src="{{ url_for('board_qrcode', board_id=board['id']) }}" alt="QR-Serialnumber" class="qr-code">
         </a>
     </div>
     {% else %}
-    <div >       
+    <div >
         <img src="{{ url_for('board_qrcode', board_id=board['id']) }}" alt="QR-Serialnumber" class="qr-code-onlyview">
     </div>
     {% endif %}
-    
+
     {% if current_user['is_admin'] or current_user['can_delete'] %}
     <form action="{{ url_for('delete_board', board_id=board['id']) }}" method="post"
           onsubmit="return confirm('Diese Platine inkl. gesamter Reparatur-Historie wirklich löschen?');">
         <button type="submit" class="btn btn-danger">Platine löschen</button>
+    </form>
+    {% endif %}
+    {% if current_user['is_admin'] or current_user['can_edit_repairs'] %}
+    <form action="{{ url_for('toggle_defective', board_id=board['id']) }}" method="post">
+        <button type="submit" class="btn {{ 'btn-secondary' if board['is_defective'] else 'btn-danger' }}">
+            {% if board['is_defective'] %}Als funktionsfähig markieren{% else %}Als defekt markieren{% endif %}
+        </button>
     </form>
     {% endif %}
 </section>
@@ -44,7 +51,7 @@
             </label>
             <label>Ticket ID
                 <input type="text" name="ticket" placeholder="Ticket ID">
-            </label>           
+            </label>
             <label>Kunde
                 <input type="text" name="customer" placeholder="Albert Einstein">
             </label>
@@ -70,7 +77,10 @@
         <label>Anhänge (mehrere möglich)
             <input type="file" name="attachments" multiple>
         </label>
-        <button type="submit" class="btn">Reparatur speichern</button>
+        <div>
+            <button type="submit" class="btn btn-danger" value="defect" onclick="return confirm('Diese Platine als defekt markieren?');">Ausschuss</button>
+            <button type="submit" class="btn" value="save">Reparatur speichern</button>
+        </div>
     </form>
 </section>
 {% else %}
@@ -95,6 +105,9 @@
                             <a href="{{ url_for('edit_repair', repair_id=repair['id']) }}" class="link edit-link">Bearbeiten</a>
                         {% endif %}
                     </div>
+                    {% if repair['is_defective'] %}
+                        <p><strong>Ausschuss:</strong> {{ repair['is_defective'] }}</p>
+                    {% endif %}
                     {% if repair['issue_description'] %}
                         <p><strong>Fehler:</strong> {{ repair['issue_description'] }}</p>
                     {% endif %}

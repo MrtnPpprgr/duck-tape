@@ -14,7 +14,7 @@ Python herunterladen und requirements.txt installieren
 ```
 python app.py
 ```
-erster Benutzer beim starten einer leeren Datenbank ist immer 
+erster Benutzer beim starten einer leeren Datenbank ist immer
 Benutzer: "admin" Passwort:"admin"
 ```
 Auf diesem PC öffnen:      http://localhost:5000
@@ -34,6 +34,10 @@ Ein Konto **ohne** diese Häkchen kann sich zwar anmelden und alles ansehen,
 aber nichts anlegen, ändern oder löschen (reine Ansichtsrechte).
 
 Seriennummer Template kann in app.py in der funktion "def next_serial_number()" geändert werden.
+
+
+.db Dateien überprüfen (###TABLE### ersetzten)
+python -c "import sqlite3; conn = sqlite3.connect('repairs.db'); cur = conn.cursor(); cur.execute('PRAGMA table_info(###TABLE###);'); print('\n'.join([str(row) for row in cur.fetchall()]))"
 
 
 ## Daten & Backup
@@ -90,4 +94,11 @@ html
 {% if repair['mein_feld'] %}
     <p><strong>Mein Feld:</strong> {{ repair['mein_feld'] }}</p>
 {% endif %}
+```
+
+7. Database anpassen
+###TABLE### ersetzten
+
+```
+python -c "import sqlite3; conn = sqlite3.connect('repairs.db'); cur = conn.cursor(); cur.execute('ALTER TABLE ###TABLE### ADD COLUMN defect INTEGER NOT NULL DEFAULT 0;'); conn.commit(); print('Spalte erfolgreich hinzugefuegt!')"
 ```

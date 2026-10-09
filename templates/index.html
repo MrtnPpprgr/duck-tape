@@ -65,6 +65,7 @@
     <table class="table">
         <thead>
             <tr>
+                <th>Status</th>
                 <th>{{ sort_link('serial_number', 'Seriennummer') }}</th>
                 <th>{{ sort_link('type', 'Typ') }}</th>
                 <th>{{ sort_link('version', 'Version') }}</th>
@@ -77,6 +78,13 @@
         <tbody>
             {% for b in boards %}
             <tr>
+                <td>
+                    {% if b['is_defective'] %}
+                        <span class="badge-defect">Ausschuss</span>
+                    {% else %}
+                        <span class="badge badge-ok">Funktionsfähig</span>
+                    {% endif %}
+                </td>
                 <td><a href="{{ url_for('board_detail', board_id=b['id']) }}" class="mono">{{ b['serial_number'] }}</a></td>
                 <td>{{ b['type_name'] or '–' }}</td>
                 <td>{{ b['version_name'] or '–' }}</td>
@@ -85,6 +93,8 @@
                         <span class="badge badge-warn">{{ b['repair_count'] }}× repariert</span>
                     {% elif b['repair_count'] == 1 %}
                         <span class="badge">1× repariert</span>
+                    {% elif b['repair_count'] == 100 %}
+                        <span class="badge-defect">Ausschuss</span>
                     {% else %}
                         <span class="badge badge-ok">noch keine</span>
                     {% endif %}
