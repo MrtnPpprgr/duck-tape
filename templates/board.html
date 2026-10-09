@@ -42,6 +42,7 @@
 </section>
 
 {% if current_user['is_admin'] or current_user['can_edit_repairs'] or current_user['can_create']%}
+{% if not board['is_defective'] %}
 <section class="card">
     <h2>Neue Reparatur eintragen</h2>
     <form action="{{ url_for('create_repair', board_id=board['id']) }}" method="post" enctype="multipart/form-data" class="form">
@@ -61,7 +62,7 @@
                 {% if current_user['is_admin'] or current_user['can_edit_repairs']%}
                     <input type="text" name="technician" value="{{ current_user['username'] }}">
                 {% else %}
-                    <input type="text" name="technician" value="{{ current_user['username'] }}" disabled>
+                    <input type="text" name="technician" value="{{ current_user['username'] }}" readonly>
                 {% endif %}
             </label>
             <label>Ersatzteile
@@ -78,11 +79,16 @@
             <input type="file" name="attachments" multiple>
         </label>
         <div>
-            <button type="submit" class="btn btn-danger" value="defect" onclick="return confirm('Diese Platine als defekt markieren?');">Ausschuss</button>
-            <button type="submit" class="btn" value="save">Reparatur speichern</button>
+            <button type="submit" name="addButton" class="btn" value="save">Reparatur speichern</button>
+            <button type="submit" name="addButton" class="btn btn-danger" value="defect" onclick="return confirm('Diese Platine als defekt markieren?');">Ausschuss</button>
         </div>
     </form>
 </section>
+{% else %}
+<section class="card">
+    <p class="muted">Platine ist als defekt markiert.</p>
+</section>
+{% endif %}
 {% else %}
 <section class="card">
     <p class="muted">Du hast nur Ansichtsrechte und kannst keine Reparaturen erfassen.</p>

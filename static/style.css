@@ -182,7 +182,7 @@ a.mono:hover { color: var(--primary); }
     border-radius: 999px;
     font-size: 0.8rem;
 }
-.badge-defect { background: #fef3c7; color: #920e0e; }
+.badge-defect { background: #fdbaba; color: #7e0e0e; }
 .badge-warn { background: #fef3c7; color: #92400e; }
 .badge-ok { background: #dcfce7; color: #166534; }
 

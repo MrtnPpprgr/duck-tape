@@ -104,6 +104,7 @@ def init_db():
             version_id      INTEGER,
             created_at      TEXT NOT NULL,
             created_by      TEXT,
+            is_defective  INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY (type_id) REFERENCES board_types (id),
             FOREIGN KEY (version_id) REFERENCES board_versions (id)
         );
@@ -616,6 +617,7 @@ def board_detail(board_id):
 @app.route("/boards/<int:board_id>/repairs", methods=["POST"])
 @permission_required("can_edit_repairs", "can_create")
 def create_repair(board_id):
+    print("FORM:", dict(request.form))
     db = get_db()
     board = db.execute("SELECT * FROM boards WHERE id = ?", (board_id,)).fetchone()
     if board is None:
@@ -628,14 +630,14 @@ def create_repair(board_id):
     parts = request.form.get("parts", "").strip()
     ticket = request.form.get("ticket", "").strip()
     customer = request.form.get("customer", "").strip()
-    is_defective = request.form.get("addButton") == "defect"
+
 
     cur = db.execute(
         """INSERT INTO repairs
-           (board_id, date, issue_description, action_taken, technician, parts, ticket, customer, is_defective, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (board_id, date, issue_description, action_taken, technician, parts, ticket, customer, 1,
-        datetime.now().isoformat(timespec="seconds")),
+           (board_id, date, issue_description, action_taken, technician, parts, ticket, customer, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (board_id, date, issue_description, action_taken, technician, parts, ticket, customer,
+         datetime.now().isoformat(timespec="seconds")),
     )
     repair_id = cur.lastrowid
 
@@ -649,6 +651,10 @@ def create_repair(board_id):
                 "INSERT INTO repair_attachments (repair_id, filename) VALUES (?, ?)",
                 (repair_id, unique_name),
             )
+
+
+    if request.form.get("addButton") == "defect":
+        db.execute("UPDATE boards SET is_defective = 1 WHERE id = ?", (board_id,))
 
     db.commit()
     flash("Reparatur-Eintrag wurde hinzugefügt.", "erfolg")
@@ -669,16 +675,15 @@ def edit_repair(repair_id):
         action_taken = request.form.get("action_taken", "").strip()
         technician = request.form.get("technician", "").strip()
         parts = request.form.get("parts", "").strip()
-        is_defective = request.form.get("addButton", "") == "defect"
 
 
 
         db.execute(
             """UPDATE repairs SET date = ?, issue_description = ?, action_taken = ?,
-               technician = ?, parts = ?, updated_at = ?, updated_by = ?, is_defective = ?
+               technician = ?, parts = ?, updated_at = ?, updated_by = ?,
                WHERE id = ?""",
             (date, issue_description, action_taken, technician, parts,
-             datetime.now().isoformat(timespec="seconds"), g.user["username"], is_defective, repair_id),
+             datetime.now().isoformat(timespec="seconds"), g.user["username"], repair_id),
         )
 
         files = request.files.getlist("attachments")
