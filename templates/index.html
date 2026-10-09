@@ -81,12 +81,16 @@
                 <td>{{ b['type_name'] or '–' }}</td>
                 <td>{{ b['version_name'] or '–' }}</td>
                 <td>
-                    {% if b['repair_count'] > 1 %}
-                        <span class="badge badge-warn">{{ b['repair_count'] }}× repariert</span>
-                    {% elif b['repair_count'] == 1 %}
-                        <span class="badge">1× repariert</span>
+                    {% if b['is_defective'] %}
+                        <span class="badge badge-defect">Ausschuss</span>
                     {% else %}
-                        <span class="badge badge-ok">noch keine</span>
+                        {% if b['repair_count'] > 1 %}
+                        <span class="badge badge-warn">{{ b['repair_count'] }}× repariert</span>
+                        {% elif b['repair_count'] == 1 %}
+                            <span class="badge">1× repariert</span>
+                        {% else %}
+                            <span class="badge badge-ok">noch keine</span>
+                        {% endif %}
                     {% endif %}
                 </td>
                 <td>{{ b['last_repair_date'] or '–' }}</td>

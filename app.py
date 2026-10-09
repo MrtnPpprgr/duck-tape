@@ -104,6 +104,7 @@ def init_db():
             version_id      INTEGER,
             created_at      TEXT NOT NULL,
             created_by      TEXT,
+            is_defective  INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY (type_id) REFERENCES board_types (id),
             FOREIGN KEY (version_id) REFERENCES board_versions (id)
         );
@@ -118,6 +119,7 @@ def init_db():
             parts               TEXT,
             ticket              TEXT,
             customer            TEXT,
+            is_defective  INTEGER NOT NULL DEFAULT 0,
             created_at          TEXT NOT NULL,
             updated_at          TEXT,
             updated_by          TEXT,
@@ -195,14 +197,14 @@ def next_serial_number(db):
     """Generiert die nächste Seriennummer, z.B. PL-B6-001 für das Jahr 2026."""
     year = datetime.now().year
     year_str = str(year)[-2:]
-    letter = chr(64 + int(year_str[0])) 
+    letter = chr(64 + int(year_str[0]))
     year_code = f"{letter}{year_str[1]}"
-    
+
     rows = db.execute(
         "SELECT serial_number FROM boards WHERE serial_number LIKE ?",
         (f"PL-{year_code}%",),
     ).fetchall()
-    
+
     highest_number = 0
     for row in rows:
         suffix = row["serial_number"].rsplit("-", 1)[-1]
@@ -615,6 +617,7 @@ def board_detail(board_id):
 @app.route("/boards/<int:board_id>/repairs", methods=["POST"])
 @permission_required("can_edit_repairs", "can_create")
 def create_repair(board_id):
+    print("FORM:", dict(request.form))
     db = get_db()
     board = db.execute("SELECT * FROM boards WHERE id = ?", (board_id,)).fetchone()
     if board is None:
@@ -627,7 +630,8 @@ def create_repair(board_id):
     parts = request.form.get("parts", "").strip()
     ticket = request.form.get("ticket", "").strip()
     customer = request.form.get("customer", "").strip()
-    
+
+
     cur = db.execute(
         """INSERT INTO repairs
            (board_id, date, issue_description, action_taken, technician, parts, ticket, customer, created_at)
@@ -647,6 +651,10 @@ def create_repair(board_id):
                 "INSERT INTO repair_attachments (repair_id, filename) VALUES (?, ?)",
                 (repair_id, unique_name),
             )
+
+
+    if request.form.get("addButton") == "defect":
+        db.execute("UPDATE boards SET is_defective = 1 WHERE id = ?", (board_id,))
 
     db.commit()
     flash("Reparatur-Eintrag wurde hinzugefügt.", "erfolg")
@@ -668,9 +676,11 @@ def edit_repair(repair_id):
         technician = request.form.get("technician", "").strip()
         parts = request.form.get("parts", "").strip()
 
+
+
         db.execute(
             """UPDATE repairs SET date = ?, issue_description = ?, action_taken = ?,
-               technician = ?, parts = ?, updated_at = ?, updated_by = ?
+               technician = ?, parts = ?, updated_at = ?, updated_by = ?,
                WHERE id = ?""",
             (date, issue_description, action_taken, technician, parts,
              datetime.now().isoformat(timespec="seconds"), g.user["username"], repair_id),
@@ -708,6 +718,20 @@ def edit_repair(repair_id):
     return render_template("edit_repair.html", repair=repair, attachments=attachments)
 
 
+@app.route("/boards/<int:board_id>/toggle-defective", methods=["POST"])
+@permission_required("can_edit_repairs")
+def toggle_defective(board_id):
+    db = get_db()
+    board = db.execute("SELECT * FROM boards WHERE id = ?", (board_id,)).fetchone()
+    if board is None:
+        abort(404)
+    new_value = 0 if board["is_defective"] else 1
+    db.execute("UPDATE boards SET is_defective = ? WHERE id = ?", (new_value, board_id))
+    db.commit()
+    flash("Status aktualisiert.", "erfolg")
+    return redirect(url_for("board_detail", board_id=board_id))
+
+
 @app.route("/boards/<int:board_id>/delete", methods=["POST"])
 @permission_required("can_delete")
 def delete_board(board_id):
@@ -719,6 +743,7 @@ def delete_board(board_id):
     db.commit()
     flash(f"Platine '{board['serial_number']}' wurde gelöscht.", "erfolg")
     return redirect(url_for("index"))
+
 
 
 @app.route("/uploads/<path:filename>")
