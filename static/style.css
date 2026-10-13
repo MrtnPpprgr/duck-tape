@@ -172,7 +172,10 @@ input:focus, textarea:focus {
 }
 a.mono:hover { color: var(--primary); }
 
-.muted { color: var(--muted); font-size: 0.9rem; }
+.muted { 
+    color: var(--muted); font-size: 0.9rem; 
+    margin: 0px;
+}
 
 .badge {
     display: inline-block;

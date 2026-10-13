@@ -10,7 +10,9 @@
         <p class="muted">
             {{ board['type_name'] or 'Kein Typ' }}
             {% if board['version_name'] %} · Version {{ board['version_name'] }}{% endif %}
-            · angelegt am {{ board['created_at'][:10] }}
+        </p>
+        <p class="muted">
+            angelegt am {{ board['created_at'][:10] }}
             {% if board['created_by'] %} von {{ board['created_by'] }}{% endif %}
         </p>
     </div>
