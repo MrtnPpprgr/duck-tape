@@ -680,7 +680,7 @@ def edit_repair(repair_id):
 
         db.execute(
             """UPDATE repairs SET date = ?, issue_description = ?, action_taken = ?,
-               technician = ?, parts = ?, updated_at = ?, updated_by = ?,
+               technician = ?, parts = ?, updated_at = ?, updated_by = ?
                WHERE id = ?""",
             (date, issue_description, action_taken, technician, parts,
              datetime.now().isoformat(timespec="seconds"), g.user["username"], repair_id),
